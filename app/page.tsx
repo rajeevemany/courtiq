@@ -1,65 +1,172 @@
-import Image from "next/image";
+import { createClient } from '@supabase/supabase-js'
 
-export default function Home() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+function daysSince(dateString: string | null): number {
+  if (!dateString) return 999
+  const last = new Date(dateString)
+  const now = new Date()
+  return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function getPriorityColor(priority: string): string {
+  if (priority === 'High') return 'border-l-red-500'
+  if (priority === 'Medium') return 'border-l-orange-400'
+  return 'border-l-blue-400'
+}
+
+function getContactColor(days: number): string {
+  if (days <= 10) return 'text-green-400'
+  if (days <= 21) return 'text-orange-400'
+  return 'text-red-400'
+}
+
+export default async function Home() {
+  const { data: recruits, error } = await supabase
+    .from('recruits')
+    .select('*')
+    .order('national_ranking', { ascending: true })
+
+  if (error) {
+    console.error(error)
+    return <div className="p-8 text-red-500">Error loading recruits: {error.message}</div>
+  }
+
+  const priorityOrder: Record<string, number> = { High: 1, Medium: 2, Watch: 3 }
+  const sorted = [...(recruits || [])].sort(
+    (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
+  )
+
+  const highPriority = sorted.filter(r => r.priority === 'High')
+  const needsAttention = sorted.filter(r => daysSince(r.last_contacted) > 21)
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-[#0a1628] text-white font-sans">
+
+      {/* HEADER */}
+      <div className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Columbia Men's Tennis</h1>
+          <p className="text-sm text-slate-400 mt-0.5">Recruiting Dashboard · Head Coach View</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-400">Class of 2026 &amp; 2027</span>
+          <button className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            + Add Recruit
+          </button>
         </div>
-      </main>
-    </div>
-  );
+      </div>
+
+      <div className="px-8 py-6 max-w-7xl mx-auto">
+
+        {/* ALERT BANNER */}
+        {needsAttention.length > 0 && (
+          <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+            <span className="text-red-400 text-lg">⚠</span>
+            <p className="text-red-300 text-sm font-medium">
+              {needsAttention.length} priority recruit{needsAttention.length > 1 ? 's have' : ' has'} not been contacted in over 21 days
+              — {needsAttention.map(r => r.name).join(', ')}
+            </p>
+          </div>
+        )}
+
+        {/* STATS */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Active Recruits', value: sorted.length, sub: 'in pipeline' },
+            { label: 'High Priority', value: highPriority.length, sub: `${needsAttention.filter(r => r.priority === 'High').length} need attention`, warn: true },
+            { label: 'Avg Fit Score', value: Math.round(sorted.reduce((a, r) => a + (r.fit_score || 0), 0) / sorted.length) + '%', sub: 'program match' },
+            { label: 'Need Attention', value: needsAttention.length, sub: 'no contact 21+ days', alert: needsAttention.length > 0 },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{stat.label}</p>
+              <p className="text-3xl font-semibold tracking-tight">{stat.value}</p>
+              <p className={`text-xs mt-1.5 font-medium ${stat.alert ? 'text-red-400' : stat.warn ? 'text-orange-400' : 'text-green-400'}`}>
+                {stat.sub}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* RECRUIT TABLE */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold">Recruit Pipeline</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{sorted.length} recruits · sorted by priority</p>
+            </div>
+          </div>
+
+          {/* TABLE HEADER */}
+          <div className="grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-3 border-b border-white/5">
+            {['Recruit', 'Ranking', 'Priority', 'Last Contact', 'Fit'].map(h => (
+              <span key={h} className="text-xs font-semibold uppercase tracking-wider text-slate-500">{h}</span>
+            ))}
+          </div>
+
+          {/* ROWS */}
+          {sorted.map((recruit) => {
+            const days = daysSince(recruit.last_contacted)
+            const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
+            return (
+              <div
+                key={recruit.id}
+                className={`grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
+              >
+                {/* NAME */}
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300 flex-shrink-0">
+                    {initials}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{recruit.name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {recruit.class_year} · {recruit.plays} · {recruit.location}
+                    </p>
+                  </div>
+                </div>
+
+                {/* RANKING */}
+                <div className={`font-mono text-sm font-semibold ${recruit.national_ranking <= 50 ? 'text-yellow-400' : 'text-slate-300'}`}>
+                  #{recruit.national_ranking}
+                </div>
+
+                {/* PRIORITY */}
+                <div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                    recruit.priority === 'High' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
+                    recruit.priority === 'Medium' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
+                    'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                  }`}>
+                    {recruit.priority}
+                  </span>
+                </div>
+
+                {/* LAST CONTACT */}
+                <div className={`text-sm font-medium ${getContactColor(days)}`}>
+                  {days === 999 ? 'Never' : `${days}d ago`}
+                  {days > 21 && <span className="ml-1">⚠</span>}
+                </div>
+
+                {/* FIT SCORE */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-blue-500"
+                      style={{ width: `${recruit.fit_score}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-slate-400">{recruit.fit_score}</span>
+                </div>
+
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </main>
+  )
 }
