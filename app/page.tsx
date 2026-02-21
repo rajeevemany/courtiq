@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import AddRecruitForm from '@/app/components/AddRecruitForm'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,9 +56,7 @@ export default async function Home() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-400">Class of 2026 &amp; 2027</span>
-          <button className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            + Add Recruit
-          </button>
+          <AddRecruitForm />
         </div>
       </div>
 
@@ -68,7 +67,7 @@ export default async function Home() {
           <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
             <span className="text-red-400 text-lg">⚠</span>
             <p className="text-red-300 text-sm font-medium">
-              {needsAttention.length} priority recruit{needsAttention.length > 1 ? 's have' : ' has'} not been contacted in over 21 days
+              {needsAttention.length} recruit{needsAttention.length > 1 ? 's have' : ' has'} not been contacted in over 21 days
               — {needsAttention.map(r => r.name).join(', ')}
             </p>
           </div>
@@ -78,14 +77,36 @@ export default async function Home() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           {[
             { label: 'Active Recruits', value: sorted.length, sub: 'in pipeline' },
-            { label: 'High Priority', value: highPriority.length, sub: `${needsAttention.filter(r => r.priority === 'High').length} need attention`, warn: true },
-            { label: 'Avg Fit Score', value: Math.round(sorted.reduce((a, r) => a + (r.fit_score || 0), 0) / sorted.length) + '%', sub: 'program match' },
-            { label: 'Need Attention', value: needsAttention.length, sub: 'no contact 21+ days', alert: needsAttention.length > 0 },
+            {
+              label: 'High Priority',
+              value: highPriority.length,
+              sub: `${needsAttention.filter(r => r.priority === 'High').length} need attention`,
+              warn: true
+            },
+            {
+              label: 'Avg Fit Score',
+              value: sorted.length > 0
+                ? Math.round(sorted.reduce((a, r) => a + (r.fit_score || 0), 0) / sorted.length) + '%'
+                : '0%',
+              sub: 'program match'
+            },
+            {
+              label: 'Need Attention',
+              value: needsAttention.length,
+              sub: 'no contact 21+ days',
+              alert: needsAttention.length > 0
+            },
           ].map((stat, i) => (
             <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">{stat.label}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">
+                {stat.label}
+              </p>
               <p className="text-3xl font-semibold tracking-tight">{stat.value}</p>
-              <p className={`text-xs mt-1.5 font-medium ${stat.alert ? 'text-red-400' : stat.warn ? 'text-orange-400' : 'text-green-400'}`}>
+              <p className={`text-xs mt-1.5 font-medium ${
+                stat.alert ? 'text-red-400' :
+                stat.warn ? 'text-orange-400' :
+                'text-green-400'
+              }`}>
                 {stat.sub}
               </p>
             </div>
@@ -97,21 +118,38 @@ export default async function Home() {
           <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
             <div>
               <h2 className="font-semibold">Recruit Pipeline</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{sorted.length} recruits · sorted by priority</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {sorted.length} recruits · sorted by priority
+              </p>
             </div>
           </div>
 
           {/* TABLE HEADER */}
           <div className="grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-3 border-b border-white/5">
             {['Recruit', 'Ranking', 'Priority', 'Last Contact', 'Fit'].map(h => (
-              <span key={h} className="text-xs font-semibold uppercase tracking-wider text-slate-500">{h}</span>
+              <span
+                key={h}
+                className="text-xs font-semibold uppercase tracking-wider text-slate-500"
+              >
+                {h}
+              </span>
             ))}
           </div>
 
           {/* ROWS */}
+          {sorted.length === 0 && (
+            <div className="text-center py-16 text-slate-500">
+              <p className="text-sm">No recruits yet</p>
+              <p className="text-xs mt-1">Click + Add Recruit to get started</p>
+            </div>
+          )}
+
           {sorted.map((recruit) => {
             const days = daysSince(recruit.last_contacted)
-            const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
+            const initials = recruit.name
+              .split(' ')
+              .map((n: string) => n[0])
+              .join('')
             return (
               <Link
                 href={`/recruits/${recruit.id}`}
@@ -132,16 +170,20 @@ export default async function Home() {
                 </div>
 
                 {/* RANKING */}
-                <div className={`font-mono text-sm font-semibold ${recruit.national_ranking <= 50 ? 'text-yellow-400' : 'text-slate-300'}`}>
-                  #{recruit.national_ranking}
+                <div className={`font-mono text-sm font-semibold ${
+                  recruit.national_ranking <= 50 ? 'text-yellow-400' : 'text-slate-300'
+                }`}>
+                  {recruit.national_ranking ? `#${recruit.national_ranking}` : '—'}
                 </div>
 
                 {/* PRIORITY */}
                 <div>
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                    recruit.priority === 'High' ? 'bg-red-500/15 text-red-400 border-red-500/30' :
-                    recruit.priority === 'Medium' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
-                    'bg-blue-500/15 text-blue-400 border-blue-500/30'
+                    recruit.priority === 'High'
+                      ? 'bg-red-500/15 text-red-400 border-red-500/30' :
+                    recruit.priority === 'Medium'
+                      ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
+                      'bg-blue-500/15 text-blue-400 border-blue-500/30'
                   }`}>
                     {recruit.priority}
                   </span>
@@ -161,7 +203,9 @@ export default async function Home() {
                       style={{ width: `${recruit.fit_score}%` }}
                     />
                   </div>
-                  <span className="text-xs font-mono text-slate-400">{recruit.fit_score}</span>
+                  <span className="text-xs font-mono text-slate-400">
+                    {recruit.fit_score}
+                  </span>
                 </div>
 
               </Link>
