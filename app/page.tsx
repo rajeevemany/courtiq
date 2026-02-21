@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import Link from 'next/link'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -112,7 +113,8 @@ export default async function Home() {
             const days = daysSince(recruit.last_contacted)
             const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
             return (
-              <div
+              <Link
+                href={`/recruits/${recruit.id}`}
                 key={recruit.id}
                 className={`grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
               >
@@ -162,7 +164,7 @@ export default async function Home() {
                   <span className="text-xs font-mono text-slate-400">{recruit.fit_score}</span>
                 </div>
 
-              </div>
+              </Link>
             )
           })}
         </div>
