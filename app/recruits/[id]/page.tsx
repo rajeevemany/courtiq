@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
+import LogContactForm from '@/app/components/LogContactForm'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,9 +63,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
           }`}>
             {recruit.priority} Priority
           </span>
-          <button className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-            + Log Contact
-          </button>
+          <LogContactForm recruitId={recruit.id} recruitName={recruit.name} />
         </div>
       </div>
 
@@ -92,7 +91,11 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                     <span className="text-white/20">·</span>
                     <span className="text-slate-300">{recruit.nationality}</span>
                     <span className="text-white/20">·</span>
-                    <span className={`font-medium text-sm ${days > 21 ? 'text-red-400' : days > 10 ? 'text-orange-400' : 'text-green-400'}`}>
+                    <span className={`font-medium text-sm ${
+                      days > 21 ? 'text-red-400' :
+                      days > 10 ? 'text-orange-400' :
+                      'text-green-400'
+                    }`}>
                       {days === 999 ? 'Never contacted' : `Last contact ${days}d ago`}
                       {days > 21 && ' ⚠'}
                     </span>
@@ -107,7 +110,9 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
 
             {/* NOTES */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">Scouting Notes</h2>
+              <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">
+                Scouting Notes
+              </h2>
               <p className="text-slate-300 leading-relaxed">
                 {recruit.notes || 'No notes added yet.'}
               </p>
@@ -127,7 +132,10 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
               {interactions && interactions.length > 0 ? (
                 <div className="flex flex-col gap-3">
                   {interactions.map((interaction) => (
-                    <div key={interaction.id} className="flex gap-4 p-4 bg-white/3 border border-white/5 rounded-xl">
+                    <div
+                      key={interaction.id}
+                      className="flex gap-4 p-4 bg-white/3 border border-white/5 rounded-xl"
+                    >
                       <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
                         interaction.type === 'call' ? 'bg-green-400' :
                         interaction.type === 'email' ? 'bg-blue-400' :
@@ -140,7 +148,11 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                             {interaction.type}
                           </span>
                           <span className="text-xs text-slate-500 font-mono">
-                            {new Date(interaction.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            {new Date(interaction.date).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
                           </span>
                         </div>
                         <p className="text-sm text-slate-300">{interaction.notes}</p>
@@ -165,7 +177,9 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
 
             {/* QUICK STATS */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">Quick Info</h2>
+              <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">
+                Quick Info
+              </h2>
               <div className="flex flex-col gap-3">
                 {[
                   { label: 'Class Year', value: recruit.class_year },
@@ -175,7 +189,10 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                   { label: 'National Ranking', value: `#${recruit.national_ranking}` },
                   { label: 'Status', value: recruit.status },
                 ].map(({ label, value }) => (
-                  <div key={label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                  <div
+                    key={label}
+                    className="flex items-center justify-between py-2 border-b border-white/5 last:border-0"
+                  >
                     <span className="text-xs text-slate-500 uppercase tracking-wider">{label}</span>
                     <span className="text-sm text-slate-200 font-medium">{value}</span>
                   </div>
@@ -191,7 +208,10 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
               {recruit.competing_schools && recruit.competing_schools.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {recruit.competing_schools.map((school: string) => (
-                    <span key={school} className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/8 border border-white/10 text-slate-300">
+                    <span
+                      key={school}
+                      className="text-xs font-medium px-3 py-1.5 rounded-full bg-white/8 border border-white/10 text-slate-300"
+                    >
                       {school}
                     </span>
                   ))}
@@ -205,10 +225,13 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
             <div className="bg-blue-500/8 border border-blue-500/20 rounded-2xl p-6">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-blue-400 text-sm">✦</span>
-                <h2 className="font-semibold text-sm uppercase tracking-wider text-blue-400">AI Brief</h2>
+                <h2 className="font-semibold text-sm uppercase tracking-wider text-blue-400">
+                  AI Brief
+                </h2>
               </div>
               <p className="text-sm text-slate-400 leading-relaxed">
-                AI-generated recruit summary coming in Phase 3. Will synthesize all notes, interactions, and ranking data into a coach-ready brief.
+                AI-generated recruit summary coming in Phase 3. Will synthesize all notes,
+                interactions, and ranking data into a coach-ready brief.
               </p>
             </div>
 
