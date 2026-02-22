@@ -3,6 +3,7 @@ import Link from 'next/link'
 import LogContactForm from '@/app/components/LogContactForm'
 import DeleteRecruitButton from '@/app/components/DeleteRecruitButton'
 import AIBriefButton from '@/app/components/AIBriefButton'
+import DocumentUpload from '@/app/components/DocumentUpload'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -172,6 +173,10 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                 </div>
               )}
             </div>
+
+            {/* DOCUMENTS */}
+            <DocumentUpload recruitId={recruit.id} />
+
           </div>
 
           {/* RIGHT COLUMN */}
