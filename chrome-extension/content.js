@@ -41,11 +41,15 @@ function extractPlayerData() {
     const cells = Array.from(document.querySelectorAll('td'))
     const cellTexts = cells.map(c => c.innerText.trim())
 
-    // Class year — find cell after "Class" label
-    const classIdx = cellTexts.findIndex(t => t.match(/^Class$/i))
-    if (classIdx !== -1 && cellTexts[classIdx + 1]) {
-      const yr = cellTexts[classIdx + 1].match(/20(2[4-9])/)
-      if (yr) data.class_year = '20' + yr[1]
+    // Class year — inside div.med containing "Class of YYYY"
+    const medDivs = document.querySelectorAll('div.med')
+    for (const div of medDivs) {
+      const text = div.innerText
+      const match = text.match(/Class of (20[2-3]\d)/i)
+      if (match) {
+        data.class_year = match[1]
+        break
+      }
     }
 
     // Playing hand — find cell after "Plays" label
