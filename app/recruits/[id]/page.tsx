@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import LogContactForm from '@/app/components/LogContactForm'
 import DeleteRecruitButton from '@/app/components/DeleteRecruitButton'
+import AIBriefButton from '@/app/components/AIBriefButton'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,7 +36,6 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
       <div className="min-h-screen bg-[#0a1628] text-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-red-400 text-lg mb-4">Recruit not found</p>
-          <p className="text-slate-500 text-sm mb-4">ID: {id}</p>
           <Link href="/" className="text-blue-400 underline">Back to dashboard</Link>
         </div>
       </div>
@@ -223,19 +223,12 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
               )}
             </div>
 
-            {/* AI BRIEF PLACEHOLDER */}
-            <div className="bg-blue-500/8 border border-blue-500/20 rounded-2xl p-6">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-blue-400 text-sm">✦</span>
-                <h2 className="font-semibold text-sm uppercase tracking-wider text-blue-400">
-                  AI Brief
-                </h2>
-              </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                AI-generated recruit summary coming in Phase 3. Will synthesize all notes,
-                interactions, and ranking data into a coach-ready brief.
-              </p>
-            </div>
+            {/* AI BRIEF */}
+            <AIBriefButton
+              recruitId={recruit.id}
+              existingBrief={recruit.ai_brief}
+              existingBriefDate={recruit.ai_brief_generated_at}
+            />
 
           </div>
         </div>
