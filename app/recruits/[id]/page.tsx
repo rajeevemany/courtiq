@@ -4,6 +4,7 @@ import LogContactForm from '@/app/components/LogContactForm'
 import DeleteRecruitButton from '@/app/components/DeleteRecruitButton'
 import AIBriefButton from '@/app/components/AIBriefButton'
 import DocumentUpload from '@/app/components/DocumentUpload'
+import EditRecruitForm from '@/app/components/EditRecruitForm'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,6 +67,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
             {recruit.priority} Priority
           </span>
           <DeleteRecruitButton recruitId={recruit.id} recruitName={recruit.name} />
+          <EditRecruitForm recruit={recruit} />
           <LogContactForm recruitId={recruit.id} recruitName={recruit.name} />
         </div>
       </div>
@@ -194,6 +196,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                   { label: 'Nationality', value: recruit.nationality },
                   { label: 'Location', value: recruit.location },
                   { label: 'National Ranking', value: `#${recruit.national_ranking}` },
+                  { label: 'UTR Rating', value: recruit.utr_rating ? recruit.utr_rating.toFixed(2) : '—' },
                   { label: 'Status', value: recruit.status },
                 ].map(({ label, value }) => (
                   <div

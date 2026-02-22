@@ -217,6 +217,62 @@ export default async function Home() {
             )
           })}
         </div>
+      {/* SUGGESTED RECRUITS */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-6">
+          <div className="px-6 py-4 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400">✦</span>
+              <h2 className="font-semibold">Needs Your Attention</h2>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Watch-list recruits you haven't contacted in 30+ days
+            </p>
+          </div>
+
+          {(() => {
+            const watchNeglected = sorted.filter(
+              r => r.priority === 'Watch' && daysSince(r.last_contacted) > 30
+            )
+
+            if (watchNeglected.length === 0) {
+              return (
+                <div className="px-6 py-8 text-center text-slate-500">
+                  <p className="text-sm">No neglected recruits — good work staying on top of your pipeline.</p>
+                </div>
+              )
+            }
+
+            return (
+              <div className="divide-y divide-white/5">
+                {watchNeglected.map(recruit => {
+                  const days = daysSince(recruit.last_contacted)
+                  const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
+                  return (
+                    <Link
+                      key={recruit.id}
+                      href={`/recruits/${recruit.id}`}
+                      className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300 flex-shrink-0">
+                        {initials}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{recruit.name}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {recruit.class_year} · #{recruit.national_ranking} · {recruit.location}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-red-400 font-medium">{days}d since contact</p>
+                        <p className="text-xs text-slate-500 mt-0.5">Fit {recruit.fit_score}%</p>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </div>
       </div>
     </main>
   )

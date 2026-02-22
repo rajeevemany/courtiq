@@ -18,6 +18,7 @@ export default function AddRecruitForm() {
     notes: '',
     competing_schools: '',
     fit_score: '50',
+    utr_rating: '',
   })
 
   async function handleSubmit() {
@@ -32,6 +33,7 @@ export default function AddRecruitForm() {
           ...form,
           national_ranking: parseInt(form.national_ranking) || null,
           fit_score: parseInt(form.fit_score) || 50,
+          utr_rating: parseFloat(form.utr_rating) || null,
           competing_schools: form.competing_schools
             ? form.competing_schools.split(',').map(s => s.trim())
             : [],
@@ -52,6 +54,7 @@ export default function AddRecruitForm() {
         notes: '',
         competing_schools: '',
         fit_score: '50',
+        utr_rating: '',
       })
       router.refresh()
     } catch (err) {
@@ -167,6 +170,20 @@ export default function AddRecruitForm() {
 
               {/* RANKING + FIT SCORE */}
               <div className="grid grid-cols-2 gap-3">
+                {/* UTR */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  UTR Rating
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.utr_rating}
+                  onChange={e => setForm(f => ({ ...f, utr_rating: e.target.value }))}
+                  placeholder="e.g. 13.50"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
                     National Ranking
