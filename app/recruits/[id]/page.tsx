@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import LogContactForm from '@/app/components/LogContactForm'
+import DeleteRecruitButton from '@/app/components/DeleteRecruitButton'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,6 +64,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
           }`}>
             {recruit.priority} Priority
           </span>
+          <DeleteRecruitButton recruitId={recruit.id} recruitName={recruit.name} />
           <LogContactForm recruitId={recruit.id} recruitName={recruit.name} />
         </div>
       </div>
