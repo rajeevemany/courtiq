@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import AddRecruitForm from '@/app/components/AddRecruitForm'
+import SignOutButton from '@/app/components/SignOutButton'
 
 export const revalidate = 0
 
@@ -58,6 +59,7 @@ export default async function Home() {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-400">Class of 2026 &amp; 2027</span>
+          <SignOutButton />
           <AddRecruitForm />
         </div>
       </div>
