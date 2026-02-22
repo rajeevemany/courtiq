@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import AddRecruitForm from '@/app/components/AddRecruitForm'
 
+export const revalidate = 0
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -136,7 +138,7 @@ export default async function Home() {
             ))}
           </div>
 
-          {/* ROWS */}
+          {/* EMPTY STATE */}
           {sorted.length === 0 && (
             <div className="text-center py-16 text-slate-500">
               <p className="text-sm">No recruits yet</p>
@@ -144,6 +146,7 @@ export default async function Home() {
             </div>
           )}
 
+          {/* ROWS */}
           {sorted.map((recruit) => {
             const days = daysSince(recruit.last_contacted)
             const initials = recruit.name
