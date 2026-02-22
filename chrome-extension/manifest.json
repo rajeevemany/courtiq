@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "CourtIQ — Tennis Recruiting",
+  "version": "1.0",
+  "description": "Add recruits to CourtIQ directly from tennisrecruiting.net",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://tennisrecruiting.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://tennisrecruiting.net/player/overview.asp*",
+        "https://tennisrecruiting.net/player.asp*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "CourtIQ"
+  }
+}
