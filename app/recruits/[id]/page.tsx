@@ -5,6 +5,7 @@ import DeleteRecruitButton from '@/app/components/DeleteRecruitButton'
 import AIBriefButton from '@/app/components/AIBriefButton'
 import DocumentUpload from '@/app/components/DocumentUpload'
 import EditRecruitForm from '@/app/components/EditRecruitForm'
+import FitScoreCalculator from '@/app/components/FitScoreCalculator'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,10 +107,6 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                     </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Program Fit</p>
-                  <p className="text-4xl font-semibold text-blue-400">{recruit.fit_score}</p>
-                </div>
               </div>
             </div>
 
@@ -184,7 +181,14 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-5">
 
-            {/* QUICK STATS */}
+            {/* FIT SCORE CALCULATOR */}
+            <FitScoreCalculator
+              recruitId={recruit.id}
+              currentScore={recruit.fit_score}
+              existingBreakdown={recruit.fit_score_breakdown}
+            />
+
+            {/* QUICK INFO */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
               <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">
                 Quick Info
@@ -195,7 +199,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                   { label: 'Plays', value: recruit.plays },
                   { label: 'Nationality', value: recruit.nationality },
                   { label: 'Location', value: recruit.location },
-                  { label: 'National Ranking', value: `#${recruit.national_ranking}` },
+                  { label: 'National Ranking', value: recruit.national_ranking ? `#${recruit.national_ranking}` : '—' },
                   { label: 'UTR Rating', value: recruit.utr_rating ? recruit.utr_rating.toFixed(2) : '—' },
                   { label: 'Status', value: recruit.status },
                 ].map(({ label, value }) => (
