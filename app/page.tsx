@@ -17,6 +17,13 @@ function daysSince(dateString: string | null): number {
   return Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24))
 }
 
+function daysUntil(dateString: string | null): number {
+  if (!dateString) return 999
+  const target = new Date(dateString)
+  const now = new Date()
+  return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+}
+
 function getPriorityColor(priority: string): string {
   if (priority === 'High') return 'border-l-red-500'
   if (priority === 'Medium') return 'border-l-orange-400'
@@ -27,6 +34,15 @@ function getContactColor(days: number): string {
   if (days <= 10) return 'text-green-400'
   if (days <= 21) return 'text-orange-400'
   return 'text-red-400'
+}
+
+function getStageColor(stage: string): string {
+  if (stage === 'Identification') return 'text-slate-400'
+  if (stage === 'Evaluation') return 'text-blue-400'
+  if (stage === 'Contact') return 'text-yellow-400'
+  if (stage === 'Offer') return 'text-orange-400'
+  if (stage === 'Committed') return 'text-green-400'
+  return 'text-slate-400'
 }
 
 export default async function Home() {
@@ -47,6 +63,16 @@ export default async function Home() {
 
   const highPriority = sorted.filter(r => r.priority === 'High')
   const needsAttention = sorted.filter(r => daysSince(r.last_contacted) > 21)
+  const windowOpeningSoon = sorted.filter(r => {
+    if (!r.first_contact_eligible) return false
+    const days = daysUntil(r.first_contact_eligible)
+    return days > 0 && days <= 30
+  })
+  const windowJustOpened = sorted.filter(r => {
+    if (!r.first_contact_eligible) return false
+    const days = daysUntil(r.first_contact_eligible)
+    return days <= 0 && days >= -14
+  })
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
@@ -66,7 +92,26 @@ export default async function Home() {
 
       <div className="px-8 py-6 max-w-7xl mx-auto">
 
-        {/* ALERT BANNER */}
+        {/* CONTACT WINDOW ALERTS */}
+        {windowJustOpened.length > 0 && (
+          <div className="mb-4 bg-green-500/10 border border-green-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+            <span className="text-green-400 text-lg">✓</span>
+            <p className="text-green-300 text-sm font-medium">
+              Contact window just opened for {windowJustOpened.length} recruit{windowJustOpened.length > 1 ? 's' : ''} — {windowJustOpened.map(r => r.name).join(', ')}
+            </p>
+          </div>
+        )}
+
+        {windowOpeningSoon.length > 0 && (
+          <div className="mb-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
+            <span className="text-yellow-400 text-lg">⏰</span>
+            <p className="text-yellow-300 text-sm font-medium">
+              Contact window opening within 30 days for {windowOpeningSoon.length} recruit{windowOpeningSoon.length > 1 ? 's' : ''} — {windowOpeningSoon.map(r => r.name).join(', ')}
+            </p>
+          </div>
+        )}
+
+        {/* EXISTING ALERT BANNER */}
         {needsAttention.length > 0 && (
           <div className="mb-6 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
             <span className="text-red-400 text-lg">⚠</span>
@@ -95,10 +140,10 @@ export default async function Home() {
               sub: 'program match'
             },
             {
-              label: 'Need Attention',
-              value: needsAttention.length,
-              sub: 'no contact 21+ days',
-              alert: needsAttention.length > 0
+              label: 'Windows Opening',
+              value: windowOpeningSoon.length + windowJustOpened.length,
+              sub: 'contact eligible soon',
+              alert: windowJustOpened.length > 0
             },
           ].map((stat, i) => (
             <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
@@ -107,7 +152,7 @@ export default async function Home() {
               </p>
               <p className="text-3xl font-semibold tracking-tight">{stat.value}</p>
               <p className={`text-xs mt-1.5 font-medium ${
-                stat.alert ? 'text-red-400' :
+                stat.alert ? 'text-green-400' :
                 stat.warn ? 'text-orange-400' :
                 'text-green-400'
               }`}>
@@ -118,7 +163,7 @@ export default async function Home() {
         </div>
 
         {/* RECRUIT TABLE */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mb-6">
           <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
             <div>
               <h2 className="font-semibold">Recruit Pipeline</h2>
@@ -129,8 +174,8 @@ export default async function Home() {
           </div>
 
           {/* TABLE HEADER */}
-          <div className="grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-3 border-b border-white/5">
-            {['Recruit', 'Ranking', 'Priority', 'Last Contact', 'Fit'].map(h => (
+          <div className="grid grid-cols-[1fr_80px_90px_100px_120px_80px] gap-4 px-6 py-3 border-b border-white/5">
+            {['Recruit', 'Ranking', 'Stage', 'Priority', 'Last Contact', 'Fit'].map(h => (
               <span
                 key={h}
                 className="text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -140,7 +185,6 @@ export default async function Home() {
             ))}
           </div>
 
-          {/* EMPTY STATE */}
           {sorted.length === 0 && (
             <div className="text-center py-16 text-slate-500">
               <p className="text-sm">No recruits yet</p>
@@ -148,18 +192,21 @@ export default async function Home() {
             </div>
           )}
 
-          {/* ROWS */}
           {sorted.map((recruit) => {
             const days = daysSince(recruit.last_contacted)
             const initials = recruit.name
               .split(' ')
               .map((n: string) => n[0])
               .join('')
+            const contactDays = recruit.first_contact_eligible
+              ? daysUntil(recruit.first_contact_eligible)
+              : null
+
             return (
               <Link
                 href={`/recruits/${recruit.id}`}
                 key={recruit.id}
-                className={`grid grid-cols-[1fr_80px_90px_120px_80px] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
+                className={`grid grid-cols-[1fr_80px_90px_100px_120px_80px] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
               >
                 {/* NAME */}
                 <div className="flex items-center gap-3">
@@ -171,6 +218,12 @@ export default async function Home() {
                     <p className="text-xs text-slate-400 mt-0.5">
                       {recruit.class_year} · {recruit.plays} · {recruit.location}
                     </p>
+                    {contactDays !== null && contactDays > 0 && contactDays <= 30 && (
+                      <p className="text-xs text-yellow-400 mt-0.5">⏰ Contact eligible in {contactDays}d</p>
+                    )}
+                    {contactDays !== null && contactDays <= 0 && contactDays >= -14 && (
+                      <p className="text-xs text-green-400 mt-0.5">✓ Contact window open</p>
+                    )}
                   </div>
                 </div>
 
@@ -179,6 +232,13 @@ export default async function Home() {
                   recruit.national_ranking <= 50 ? 'text-yellow-400' : 'text-slate-300'
                 }`}>
                   {recruit.national_ranking ? `#${recruit.national_ranking}` : '—'}
+                </div>
+
+                {/* STAGE */}
+                <div>
+                  <span className={`text-xs font-semibold ${getStageColor(recruit.recruit_stage || 'Identification')}`}>
+                    {recruit.recruit_stage || 'ID'}
+                  </span>
                 </div>
 
                 {/* PRIORITY */}
@@ -217,8 +277,9 @@ export default async function Home() {
             )
           })}
         </div>
-      {/* SUGGESTED RECRUITS */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden mt-6">
+
+        {/* NEEDS ATTENTION */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10">
             <div className="flex items-center gap-2">
               <span className="text-blue-400">✦</span>

@@ -14,6 +14,8 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
+    console.log('Updating recruit:', id, body)
+
     const { error, data } = await supabase
       .from('recruits')
       .update(body)
@@ -21,11 +23,17 @@ export async function PATCH(
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('Supabase error:', error)
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error(error)
+    console.error('Route error:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to update recruit' },
       { status: 500 }

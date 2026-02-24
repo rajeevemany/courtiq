@@ -16,6 +16,10 @@ interface Recruit {
   utr_rating: number | null
   competing_schools: string[]
   notes: string
+  recruit_stage: string | null
+  high_school_grad_year: number | null
+  first_contact_eligible: string | null
+  contact_window_notes: string | null
 }
 
 interface Props {
@@ -38,6 +42,10 @@ export default function EditRecruitForm({ recruit }: Props) {
     utr_rating: String(recruit.utr_rating || ''),
     competing_schools: recruit.competing_schools?.join(', ') || '',
     notes: recruit.notes || '',
+    recruit_stage: recruit.recruit_stage || 'Identification',
+    high_school_grad_year: String(recruit.high_school_grad_year || ''),
+    first_contact_eligible: recruit.first_contact_eligible || '',
+    contact_window_notes: recruit.contact_window_notes || '',
   })
 
   async function handleSave() {
@@ -47,14 +55,23 @@ export default function EditRecruitForm({ recruit }: Props) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
+          name: form.name,
           class_year: parseInt(form.class_year) || null,
+          nationality: form.nationality,
+          location: form.location,
           national_ranking: parseInt(form.national_ranking) || null,
+          plays: form.plays,
+          priority: form.priority,
           fit_score: parseInt(form.fit_score) || 50,
           utr_rating: parseFloat(form.utr_rating) || null,
           competing_schools: form.competing_schools
             ? form.competing_schools.split(',').map(s => s.trim())
             : [],
+          notes: form.notes,
+          recruit_stage: form.recruit_stage,
+          high_school_grad_year: parseInt(form.high_school_grad_year) || null,
+          first_contact_eligible: form.first_contact_eligible || null,
+          contact_window_notes: form.contact_window_notes || null,
         }),
       })
 
@@ -219,6 +236,62 @@ export default function EditRecruitForm({ recruit }: Props) {
                   className={inputClass}
                 />
               </div>
+{/* RECRUIT STAGE */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  Recruit Stage
+                </label>
+                <select
+                  value={form.recruit_stage}
+                  onChange={e => setForm(f => ({ ...f, recruit_stage: e.target.value }))}
+                  className={selectClass}
+                >
+                  {['Identification', 'Evaluation', 'Contact', 'Offer', 'Committed'].map(s => (
+                    <option key={s} value={s} className="bg-[#0f2040]">{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* CONTACT WINDOW */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                    HS Grad Year
+                  </label>
+                  <input
+                    type="number"
+                    value={form.high_school_grad_year}
+                    onChange={e => setForm(f => ({ ...f, high_school_grad_year: e.target.value }))}
+                    placeholder="e.g. 2027"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                    First Contact Date
+                  </label>
+                  <input
+                    type="date"
+                    value={form.first_contact_eligible}
+                    onChange={e => setForm(f => ({ ...f, first_contact_eligible: e.target.value }))}
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              {/* CONTACT WINDOW NOTES */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  Compliance Notes
+                </label>
+                <input
+                  type="text"
+                  value={form.contact_window_notes}
+                  onChange={e => setForm(f => ({ ...f, contact_window_notes: e.target.value }))}
+                  placeholder="NCAA compliance notes..."
+                  className={inputClass}
+                />
+              </div>
 
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">Scouting Notes</label>
@@ -252,4 +325,4 @@ export default function EditRecruitForm({ recruit }: Props) {
       )}
     </>
   )
-}
+}   
