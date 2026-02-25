@@ -106,7 +106,7 @@ export async function GET(request: Request) {
 
     if (scrapedRanking === null) {
       // Log a snippet to help debug regex patterns if parsing fails
-      console.error(`Parse failed for ${recruit.name} (id=${recruit.tennisrecruiting_id}). HTML snippet:`, html.substring(0, 2000))
+      console.error(`Parse failed for ${recruit.name} (id=${recruit.tennisrecruiting_id}). HTML length: ${html.length}. HTML snippet [3000-8000]:`, html.substring(3000, 8000))
       results.failed++
       results.details.push({ id: recruit.id, name: recruit.name, status: 'failed', error: 'Parse failed' })
       await sleep(500)
