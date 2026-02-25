@@ -12,7 +12,9 @@ function sleep(ms: number): Promise<void> {
 
 function parseRankingFromHtml(html: string): number | null {
   const patterns = [
-    // Primary: <a href="/list.asp...">35</a> — tennisrecruiting.net ranking link
+    // Primary: twitter:description meta tag — "Ranked 35th in the nation."
+    /<meta[^>]*name=["']twitter:description["'][^>]*content=["'][^"']*Ranked (\d+)(?:st|nd|rd|th) in the nation/i,
+    // Secondary: <a href="/list.asp...">35</a> — tennisrecruiting.net ranking link
     /<a\s[^>]*href=["'][^"']*\/list\.asp[^"']*["'][^>]*>\s*(\d+)\s*<\/a>/i,
     // Fallbacks: "National Ranking" label cell followed by value cell
     /National\s+Ranking<\/td>\s*<td[^>]*>\s*#?(\d+)/i,
