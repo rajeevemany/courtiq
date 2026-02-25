@@ -12,9 +12,10 @@ function sleep(ms: number): Promise<void> {
 
 function parseRankingFromHtml(html: string): number | null {
   const patterns = [
-    // Most specific: exact "National Ranking" label cell followed by value cell
+    // Primary: <a href="/list.asp...">35</a> — tennisrecruiting.net ranking link
+    /<a\s[^>]*href=["'][^"']*\/list\.asp[^"']*["'][^>]*>\s*(\d+)\s*<\/a>/i,
+    // Fallbacks: "National Ranking" label cell followed by value cell
     /National\s+Ranking<\/td>\s*<td[^>]*>\s*#?(\d+)/i,
-    // Allows extra markup inside the label cell
     /National\s+Ranking[^<]*<\/td>\s*<td[^>]*>\s*#?(\d+)/i,
     // data-attribute or class with "ranking" near a number
     /"ranking"[^>]*>\s*#?(\d+)/i,
