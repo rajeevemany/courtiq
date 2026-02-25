@@ -13,11 +13,15 @@ interface Recruit {
   utr_rating: number | null
   utr_trend: string
   utr_trend_value: number
+  ranking_trend: string
+  ranking_trend_value: number
   fit_score: number
   priority: string
   last_contacted: string | null
   plays: string
+  tennisrecruiting_id: string | null
   utr_history: { utr_rating: number, recorded_date: string }[]
+  ranking_history: { national_ranking: number, recorded_date: string }[]
 }
 
 interface DiscoveryData {
@@ -25,6 +29,7 @@ interface DiscoveryData {
   undervalued: Recruit[]
   risingStars: Recruit[]
   undercontacted: Recruit[]
+  risingRankings: Recruit[]
 }
 
 function TrendBadge({ trend, value }: { trend: string, value: number }) {
@@ -39,6 +44,20 @@ function TrendBadge({ trend, value }: { trend: string, value: number }) {
     </span>
   )
   return <span className="text-xs text-slate-500">→ Stable</span>
+}
+
+function RankingTrendBadge({ trend, value }: { trend: string, value: number }) {
+  if (trend === 'rising') return (
+    <span className="text-xs font-semibold text-emerald-400">
+      ↑ #{Math.abs(value)} rank
+    </span>
+  )
+  if (trend === 'falling') return (
+    <span className="text-xs font-semibold text-red-400">
+      ↓ #{Math.abs(value)} rank
+    </span>
+  )
+  return null
 }
 
 function RecruitCard({ recruit }: { recruit: Recruit }) {
@@ -62,6 +81,7 @@ function RecruitCard({ recruit }: { recruit: Recruit }) {
             <span className="text-xs text-slate-400">UTR {recruit.utr_rating}</span>
           )}
           <TrendBadge trend={recruit.utr_trend} value={recruit.utr_trend_value} />
+          <RankingTrendBadge trend={recruit.ranking_trend} value={recruit.ranking_trend_value} />
         </div>
       </div>
       <div className="text-right flex-shrink-0">
@@ -75,7 +95,7 @@ function RecruitCard({ recruit }: { recruit: Recruit }) {
 export default function DiscoveryPage() {
   const [data, setData] = useState<DiscoveryData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'undervalued' | 'rising' | 'undercontacted' | 'all'>('undervalued')
+  const [activeTab, setActiveTab] = useState<'undervalued' | 'rising' | 'risingRankings' | 'undercontacted' | 'all'>('undervalued')
   const [showAddUTR, setShowAddUTR] = useState(false)
   const [utrForm, setUtrForm] = useState({
     recruit_id: '',
@@ -130,14 +150,17 @@ export default function DiscoveryPage() {
   }
 
   const tabs = [
-    { key: 'undervalued', label: 'Undervalued', count: data?.undervalued.length || 0 },
-    { key: 'rising', label: 'Rising Stars', count: data?.risingStars.length || 0 },
-    { key: 'undercontacted', label: 'Under-contacted', count: data?.undercontacted.length || 0 },
-    { key: 'all', label: 'All Recruits', count: data?.all.length || 0 },
+    { key: 'undervalued',    label: 'Undervalued',       count: data?.undervalued.length || 0 },
+    { key: 'rising',         label: 'Rising Stars',       count: data?.risingStars.length || 0 },
+    { key: 'risingRankings', label: 'Rising Rankings',    count: data?.risingRankings.length || 0 },
+    { key: 'undercontacted', label: 'Under-contacted',    count: data?.undercontacted.length || 0 },
+    { key: 'all',            label: 'All Recruits',       count: data?.all.length || 0 },
   ]
 
-  const activeRecruits = activeTab === 'undervalued' ? data?.undervalued :
-    activeTab === 'rising' ? data?.risingStars :
+  const activeRecruits =
+    activeTab === 'undervalued'    ? data?.undervalued :
+    activeTab === 'rising'         ? data?.risingStars :
+    activeTab === 'risingRankings' ? data?.risingRankings :
     activeTab === 'undercontacted' ? data?.undercontacted :
     data?.all
 
@@ -167,13 +190,19 @@ export default function DiscoveryPage() {
       <div className="px-8 py-6 max-w-5xl mx-auto">
 
         {/* STATS */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           {[
             {
               label: 'Rising Stars',
               value: data?.risingStars.length || 0,
               sub: 'UTR trending up 0.5+',
               color: 'text-green-400'
+            },
+            {
+              label: 'Rising Rankings',
+              value: data?.risingRankings.length || 0,
+              sub: 'Rank improved 2+ places',
+              color: 'text-emerald-400'
             },
             {
               label: 'Undervalued',
@@ -224,10 +253,11 @@ export default function DiscoveryPage() {
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10">
             <p className="text-sm text-slate-400">
-              {activeTab === 'undervalued' && 'Players in your target ranking range with high fit scores not yet marked High priority'}
-              {activeTab === 'rising' && 'Players whose UTR has increased by 0.5 or more — trending up fast'}
+              {activeTab === 'undervalued'    && 'Players in your target ranking range with high fit scores not yet marked High priority'}
+              {activeTab === 'rising'         && 'Players whose UTR has increased by 0.5 or more — trending up fast'}
+              {activeTab === 'risingRankings' && 'Players whose national ranking has improved by 2 or more places — climbing the charts'}
               {activeTab === 'undercontacted' && 'High fit players you haven\'t reached out to recently'}
-              {activeTab === 'all' && 'All recruits with UTR trend analysis'}
+              {activeTab === 'all'            && 'All recruits with UTR and ranking trend analysis'}
             </p>
           </div>
 
@@ -240,6 +270,9 @@ export default function DiscoveryPage() {
               <p className="text-sm">No recruits in this category yet.</p>
               {activeTab === 'rising' && (
                 <p className="text-xs mt-2">Log multiple UTR ratings over time to track trends.</p>
+              )}
+              {activeTab === 'risingRankings' && (
+                <p className="text-xs mt-2">Rankings sync automatically every 24h for recruits with a TennisRecruiting ID.</p>
               )}
             </div>
           ) : (

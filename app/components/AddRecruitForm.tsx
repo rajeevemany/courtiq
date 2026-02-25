@@ -19,6 +19,7 @@ export default function AddRecruitForm() {
     competing_schools: '',
     fit_score: '50',
     utr_rating: '',
+    tennisrecruiting_id: '',
   })
 
   async function handleSubmit() {
@@ -34,6 +35,7 @@ export default function AddRecruitForm() {
           national_ranking: parseInt(form.national_ranking) || null,
           fit_score: parseInt(form.fit_score) || 50,
           utr_rating: parseFloat(form.utr_rating) || null,
+          tennisrecruiting_id: form.tennisrecruiting_id.trim() || null,
           competing_schools: form.competing_schools
             ? form.competing_schools.split(',').map(s => s.trim())
             : [],
@@ -55,6 +57,7 @@ export default function AddRecruitForm() {
         competing_schools: '',
         fit_score: '50',
         utr_rating: '',
+        tennisrecruiting_id: '',
       })
       router.refresh()
     } catch (err) {
@@ -247,6 +250,20 @@ export default function AddRecruitForm() {
                   value={form.competing_schools}
                   onChange={e => setForm(f => ({ ...f, competing_schools: e.target.value }))}
                   placeholder="Princeton, Yale, Penn (comma separated)"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+
+              {/* TENNISRECRUITING ID */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  TennisRecruiting ID <span className="text-slate-600 normal-case font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.tennisrecruiting_id}
+                  onChange={e => setForm(f => ({ ...f, tennisrecruiting_id: e.target.value }))}
+                  placeholder="e.g. 123456 (enables auto ranking sync)"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>

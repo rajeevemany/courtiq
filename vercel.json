@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/sync-rankings",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

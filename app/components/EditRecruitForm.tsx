@@ -20,6 +20,7 @@ interface Recruit {
   high_school_grad_year: number | null
   first_contact_eligible: string | null
   contact_window_notes: string | null
+  tennisrecruiting_id: string | null
 }
 
 interface Props {
@@ -46,6 +47,7 @@ export default function EditRecruitForm({ recruit }: Props) {
     high_school_grad_year: String(recruit.high_school_grad_year || ''),
     first_contact_eligible: recruit.first_contact_eligible || '',
     contact_window_notes: recruit.contact_window_notes || '',
+    tennisrecruiting_id: recruit.tennisrecruiting_id || '',
   })
 
   async function handleSave() {
@@ -72,6 +74,7 @@ export default function EditRecruitForm({ recruit }: Props) {
           high_school_grad_year: parseInt(form.high_school_grad_year) || null,
           first_contact_eligible: form.first_contact_eligible || null,
           contact_window_notes: form.contact_window_notes || null,
+          tennisrecruiting_id: form.tennisrecruiting_id.trim() || null,
         }),
       })
 
@@ -289,6 +292,19 @@ export default function EditRecruitForm({ recruit }: Props) {
                   value={form.contact_window_notes}
                   onChange={e => setForm(f => ({ ...f, contact_window_notes: e.target.value }))}
                   placeholder="NCAA compliance notes..."
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  TennisRecruiting ID
+                </label>
+                <input
+                  type="text"
+                  value={form.tennisrecruiting_id}
+                  onChange={e => setForm(f => ({ ...f, tennisrecruiting_id: e.target.value }))}
+                  placeholder="e.g. 123456 (from tennisrecruiting.net/player.asp?id=...)"
                   className={inputClass}
                 />
               </div>
