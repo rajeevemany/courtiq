@@ -212,6 +212,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    console.log('HTML length:', raw_html.length)
+
+    // Look for key markers
+    console.log('Has doublewide:', raw_html.includes('doublewide'))
+    console.log('Has class="c":', raw_html.includes('class="c"'))
+    console.log('Has win class:', raw_html.includes('class="win"'))
+    console.log('Has loss class:', raw_html.includes('class="loss"'))
+
+    // Find the activity table section
+    const activityIndex = raw_html.indexOf('doublewide')
+    if (activityIndex > -1) {
+      console.log('Activity section preview:', raw_html.substring(activityIndex - 100, activityIndex + 500))
+    }
+
     const parsed = parseTennisRecruitingHTML(raw_html)
     console.log('Parsed TR matches from raw_html:', parsed.length)
 
