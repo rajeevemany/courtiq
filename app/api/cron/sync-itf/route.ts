@@ -45,15 +45,16 @@ export async function GET(request: Request) {
     },
     signal: AbortSignal.timeout(15000),
   })
-  if (!res.ok) {
-    return NextResponse.json({ error: `ITF API returned ${res.status}` }, { status: 500 })
-  }
   const text = await res.text()
+  console.log('ITF response status:', res.status)
+  console.log('ITF response first 500 chars:', text.substring(0, 500))
+
   if (!text.startsWith('[') && !text.startsWith('{')) {
-    console.error('ITF API returned non-JSON response:', text.slice(0, 500))
-    return NextResponse.json({ error: 'ITF API returned non-JSON response' }, { status: 500 })
+    return NextResponse.json({ error: 'ITF API returned non-JSON', preview: text.substring(0, 200) }, { status: 500 })
   }
-  const players: ITFPlayer[] = JSON.parse(text)
+
+  const parsed = JSON.parse(text)
+  const players: ITFPlayer[] = Array.isArray(parsed) ? parsed : parsed.items || parsed
 
   // 2. Filter to allowed nationalities
   const filtered = players.filter(p => ALLOWED_NATIONALITIES.has(p.playerNationalityCode))
