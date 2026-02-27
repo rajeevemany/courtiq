@@ -86,7 +86,10 @@ export default async function Home() {
         <div className="flex items-center gap-3">
           <span className="text-sm text-slate-400">Class of 2026 &amp; 2027</span>
           <Link href="/discovery" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
-            ✦ Discovery
+            ✦ Scouting Discovery
+          </Link>
+          <Link href="/itf-import" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
+            🌍 ITF Scout
           </Link>
           <SignOutButton />
           <AddRecruitForm />

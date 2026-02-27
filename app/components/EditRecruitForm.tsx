@@ -21,6 +21,7 @@ interface Recruit {
   first_contact_eligible: string | null
   contact_window_notes: string | null
   tennisrecruiting_id: string | null
+  itf_player_id: string | null
 }
 
 interface Props {
@@ -48,6 +49,7 @@ export default function EditRecruitForm({ recruit }: Props) {
     first_contact_eligible: recruit.first_contact_eligible || '',
     contact_window_notes: recruit.contact_window_notes || '',
     tennisrecruiting_id: recruit.tennisrecruiting_id || '',
+    itf_player_id: recruit.itf_player_id || '',
   })
 
   async function handleSave() {
@@ -75,6 +77,7 @@ export default function EditRecruitForm({ recruit }: Props) {
           first_contact_eligible: form.first_contact_eligible || null,
           contact_window_notes: form.contact_window_notes || null,
           tennisrecruiting_id: form.tennisrecruiting_id.trim() || null,
+          itf_player_id: form.itf_player_id.trim() || null,
         }),
       })
 
@@ -296,17 +299,31 @@ export default function EditRecruitForm({ recruit }: Props) {
                 />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                  TennisRecruiting ID
-                </label>
-                <input
-                  type="text"
-                  value={form.tennisrecruiting_id}
-                  onChange={e => setForm(f => ({ ...f, tennisrecruiting_id: e.target.value }))}
-                  placeholder="e.g. 123456 (from tennisrecruiting.net/player.asp?id=...)"
-                  className={inputClass}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                    TennisRecruiting ID
+                  </label>
+                  <input
+                    type="text"
+                    value={form.tennisrecruiting_id}
+                    onChange={e => setForm(f => ({ ...f, tennisrecruiting_id: e.target.value }))}
+                    placeholder="e.g. 123456"
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                    ITF Player ID
+                  </label>
+                  <input
+                    type="text"
+                    value={form.itf_player_id}
+                    onChange={e => setForm(f => ({ ...f, itf_player_id: e.target.value }))}
+                    placeholder="e.g. 100123456"
+                    className={inputClass}
+                  />
+                </div>
               </div>
 
               <div>
