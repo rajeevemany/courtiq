@@ -108,7 +108,7 @@ export default function ITFImportPage() {
             {status === 'fetching' ? 'Fetching...' : 'Fetch Rankings'}
           </button>
 
-          {(status === 'fetched' || status === 'error') && filtered.length > 0 && (
+          {(status === 'fetched' || status === 'importing' || status === 'error') && filtered.length > 0 && (
             <button
               onClick={handleImport}
               disabled={status === 'importing'}
