@@ -176,13 +176,17 @@ export async function GET(req: NextRequest) {
 // POST /api/match-results  { recruit_id }
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
-  const { recruit_id } = await req.json()
+  const body = await req.json()
+  console.log('match-results POST body:', body)
+  const { recruit_id } = body
 
   const { data: recruit, error: rErr } = await supabase
     .from('recruits')
     .select('name, tennisrecruiting_id, itf_player_id, nationality')
     .eq('id', recruit_id)
     .single()
+
+  console.log('recruit lookup result:', JSON.stringify(recruit), 'error:', JSON.stringify(rErr))
 
   if (rErr || !recruit) {
     return NextResponse.json({ error: 'Recruit not found' }, { status: 404 })
