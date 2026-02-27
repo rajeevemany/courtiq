@@ -192,10 +192,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Recruit not found' }, { status: 404 })
   }
 
-  const allMatches: (ParsedMatch & { recruit_id: string; source: string })[] = []
+  const trMatches: (ParsedMatch & { recruit_id: string; source: string })[] = []
+  const itfMatches: (ParsedMatch & { recruit_id: string; source: string })[] = []
 
   // ---- TennisRecruiting ----
   if (recruit.tennisrecruiting_id) {
+    console.log('Fetching TR activity page for ID:', recruit.tennisrecruiting_id)
     try {
       const url = `https://www.tennisrecruiting.net/player/activity.asp?id=${recruit.tennisrecruiting_id}`
       const res = await fetch(url, {
@@ -206,13 +208,15 @@ export async function POST(req: NextRequest) {
           'Referer': 'https://www.tennisrecruiting.net/',
         },
       })
+      console.log('TR activity response status:', res.status)
+      const text = await res.text()
+      console.log('TR activity response preview:', text.substring(0, 500))
       if (res.ok) {
-        const html = await res.text()
-        const parsed = parseTennisRecruitingHTML(html)
-        parsed.forEach(m => allMatches.push({ ...m, recruit_id, source: 'tennisrecruiting' }))
+        const parsed = parseTennisRecruitingHTML(text)
+        parsed.forEach(m => trMatches.push({ ...m, recruit_id, source: 'tennisrecruiting' }))
       }
     } catch (err) {
-      console.error('TennisRecruiting fetch error:', err)
+      console.log('TR activity fetch error:', err)
     }
   }
 
@@ -236,12 +240,16 @@ export async function POST(req: NextRequest) {
       if (res.ok) {
         const html = await res.text()
         const parsed = parseITFHTML(html)
-        parsed.forEach(m => allMatches.push({ ...m, recruit_id, source: 'itf' }))
+        parsed.forEach(m => itfMatches.push({ ...m, recruit_id, source: 'itf' }))
       }
     } catch (err) {
       console.error('ITF fetch error:', err)
     }
   }
+
+  const allMatches = [...trMatches, ...itfMatches]
+
+  console.log('Returning result - TR matches:', trMatches.length, 'ITF matches:', itfMatches.length)
 
   if (allMatches.length === 0) {
     return NextResponse.json({ success: true, fetched: 0 })
