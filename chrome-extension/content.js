@@ -282,6 +282,7 @@ function extractPlayerData() {
         notes: overlay.querySelector('#cq-notes').value,
         fit_score: 50,
         competing_schools: [],
+        tennisrecruiting_id: data.tennisrecruiting_id || null,
       }
 
       try {

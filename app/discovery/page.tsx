@@ -24,12 +24,28 @@ interface Recruit {
   ranking_history: { national_ranking: number, recorded_date: string }[]
 }
 
+interface Prospect {
+  id: string
+  name: string
+  national_ranking: number | null
+  itf_ranking: number | null
+  class_year: number | null
+  location: string | null
+  nationality: string | null
+  tennisrecruiting_id: string | null
+  itf_player_id: string | null
+  rank_movement: number | null
+  is_rising: boolean
+  source: string
+}
+
 interface DiscoveryData {
   all: Recruit[]
   undervalued: Recruit[]
   risingStars: Recruit[]
   undercontacted: Recruit[]
   risingRankings: Recruit[]
+  notInPipeline: Prospect[]
 }
 
 function TrendBadge({ trend, value }: { trend: string, value: number }) {
@@ -92,10 +108,85 @@ function RecruitCard({ recruit }: { recruit: Recruit }) {
   )
 }
 
+function ProspectCard({ prospect, onAdded }: { prospect: Prospect, onAdded: () => void }) {
+  const [adding, setAdding] = useState(false)
+
+  async function handleAdd() {
+    setAdding(true)
+    try {
+      const res = await fetch('/api/recruits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: prospect.name,
+          class_year: prospect.class_year,
+          national_ranking: prospect.national_ranking,
+          location: prospect.location,
+          nationality: prospect.nationality || 'USA',
+          tennisrecruiting_id: prospect.tennisrecruiting_id,
+          priority: 'Watch',
+          fit_score: 50,
+          competing_schools: [],
+          notes: prospect.source === 'itf'
+            ? `ITF Rank #${prospect.itf_ranking}. Imported from ITF junior rankings.`
+            : `Imported from tennisrecruiting.net top 200 scan.`,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      await fetch(`/api/prospects?id=${prospect.id}`, { method: 'DELETE' })
+      onAdded()
+    } catch {
+      setAdding(false)
+    }
+  }
+
+  const rankDisplay = prospect.source === 'itf'
+    ? `ITF #${prospect.itf_ranking}`
+    : `#${prospect.national_ranking}`
+
+  return (
+    <div className="flex items-center gap-4 p-4 bg-white/3 border border-white/5 rounded-xl">
+      <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
+        {prospect.name.split(' ').map(n => n[0]).join('')}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm text-white">{prospect.name}</p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          {prospect.class_year && `${prospect.class_year} · `}{rankDisplay}
+          {prospect.location && ` · ${prospect.location}`}
+          {prospect.nationality && ` · ${prospect.nationality}`}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+            prospect.source === 'itf'
+              ? 'bg-purple-900/40 text-purple-400'
+              : 'bg-blue-900/40 text-blue-400'
+          }`}>
+            {prospect.source === 'itf' ? 'ITF' : 'TR'}
+          </span>
+          {prospect.is_rising && (
+            <span className="text-xs font-semibold text-emerald-400">↑ Rising fast</span>
+          )}
+          {prospect.rank_movement !== null && prospect.rank_movement <= -10 && !prospect.is_rising && (
+            <span className="text-xs font-semibold text-emerald-400">↑ +{Math.abs(prospect.rank_movement)}</span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={handleAdd}
+        disabled={adding}
+        className="flex-shrink-0 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
+      >
+        {adding ? 'Adding...' : '+ Pipeline'}
+      </button>
+    </div>
+  )
+}
+
 export default function DiscoveryPage() {
   const [data, setData] = useState<DiscoveryData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'undervalued' | 'rising' | 'risingRankings' | 'undercontacted' | 'all'>('undervalued')
+  const [activeTab, setActiveTab] = useState<'undervalued' | 'rising' | 'risingRankings' | 'undercontacted' | 'all' | 'notInPipeline'>('undervalued')
   const [showAddUTR, setShowAddUTR] = useState(false)
   const [utrForm, setUtrForm] = useState({
     recruit_id: '',
@@ -155,14 +246,17 @@ export default function DiscoveryPage() {
     { key: 'risingRankings', label: 'Rising Rankings',    count: data?.risingRankings.length || 0 },
     { key: 'undercontacted', label: 'Under-contacted',    count: data?.undercontacted.length || 0 },
     { key: 'all',            label: 'All Recruits',       count: data?.all.length || 0 },
+    { key: 'notInPipeline',  label: 'Not In Pipeline',    count: data?.notInPipeline.length || 0 },
   ]
 
-  const activeRecruits =
+  const activeRecruits = activeTab === 'notInPipeline' ? null :
     activeTab === 'undervalued'    ? data?.undervalued :
     activeTab === 'rising'         ? data?.risingStars :
     activeTab === 'risingRankings' ? data?.risingRankings :
     activeTab === 'undercontacted' ? data?.undercontacted :
     data?.all
+
+  const activeProspects = activeTab === 'notInPipeline' ? data?.notInPipeline : null
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
@@ -190,7 +284,7 @@ export default function DiscoveryPage() {
       <div className="px-8 py-6 max-w-5xl mx-auto">
 
         {/* STATS */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-4 mb-6">
           {[
             {
               label: 'Rising Stars',
@@ -216,6 +310,12 @@ export default function DiscoveryPage() {
               sub: 'High fit, 14+ days no contact',
               color: 'text-orange-400'
             },
+            {
+              label: 'Not In Pipeline',
+              value: data?.notInPipeline.length || 0,
+              sub: 'Prospects not yet added',
+              color: 'text-purple-400'
+            },
           ].map((stat, i) => (
             <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">
@@ -228,7 +328,7 @@ export default function DiscoveryPage() {
         </div>
 
         {/* TABS */}
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           {tabs.map(tab => (
             <button
               key={tab.key}
@@ -249,7 +349,7 @@ export default function DiscoveryPage() {
           ))}
         </div>
 
-        {/* RECRUIT LIST */}
+        {/* LIST */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10">
             <p className="text-sm text-slate-400">
@@ -258,6 +358,7 @@ export default function DiscoveryPage() {
               {activeTab === 'risingRankings' && 'Players whose national ranking has improved by 2 or more places — climbing the charts'}
               {activeTab === 'undercontacted' && 'High fit players you haven\'t reached out to recently'}
               {activeTab === 'all'            && 'All recruits with UTR and ranking trend analysis'}
+              {activeTab === 'notInPipeline'  && 'Players ranked in the top 200 nationally or top ITF juniors not yet in your pipeline'}
             </p>
           </div>
 
@@ -265,6 +366,19 @@ export default function DiscoveryPage() {
             <div className="px-6 py-12 text-center text-slate-500">
               <p className="text-sm">Loading discovery data...</p>
             </div>
+          ) : activeProspects ? (
+            activeProspects.length === 0 ? (
+              <div className="px-6 py-12 text-center text-slate-500">
+                <p className="text-sm">No prospects found yet.</p>
+                <p className="text-xs mt-2">Run the ranking scan cron to populate prospects.</p>
+              </div>
+            ) : (
+              <div className="p-4 flex flex-col gap-3">
+                {activeProspects.map(prospect => (
+                  <ProspectCard key={prospect.id} prospect={prospect} onAdded={fetchDiscovery} />
+                ))}
+              </div>
+            )
           ) : !activeRecruits || activeRecruits.length === 0 ? (
             <div className="px-6 py-12 text-center text-slate-500">
               <p className="text-sm">No recruits in this category yet.</p>

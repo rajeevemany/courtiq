@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const TR_LISTS = [
+  { id: 1275, classYear: 2027 },
+  { id: 1285, classYear: 2028 },
+  { id: 1295, classYear: 2029 },
+]
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -55,6 +61,143 @@ async function fetchPlayerPage(tennisrecruitingId: string): Promise<string | nul
     console.error(`Fetch failed for tennisrecruiting_id=${tennisrecruitingId}:`, err)
     return null
   }
+}
+
+async function fetchListPage(listId: number, page: number): Promise<string | null> {
+  const url = `https://www.tennisrecruiting.net/list.asp?id=${listId}&page=${page}`
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CourtIQ-Recruiter/1.0)',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(10000),
+    })
+    if (!res.ok) return null
+    return await res.text()
+  } catch {
+    return null
+  }
+}
+
+function parseListPagePlayers(html: string): Array<{
+  tennisrecruiting_id: string
+  name: string
+  national_ranking: number
+  location: string | null
+}> {
+  const players: Array<{
+    tennisrecruiting_id: string
+    name: string
+    national_ranking: number
+    location: string | null
+  }> = []
+
+  // Extract player links: /player.asp?id=NNNN
+  const playerRegex = /<a\s+href=["']\/player\.asp\?id=(\d+)["'][^>]*>([^<]+)<\/a>/gi
+  // Extract small rank numbers from table cells
+  const rankRegex = /<td[^>]*>\s*(\d{1,3})\s*<\/td>/g
+
+  const rankMatches: number[] = []
+  let rankMatch
+  while ((rankMatch = rankRegex.exec(html)) !== null) {
+    const num = parseInt(rankMatch[1], 10)
+    if (num >= 1 && num <= 200) rankMatches.push(num)
+  }
+
+  let playerMatch
+  let rankIndex = 0
+  while ((playerMatch = playerRegex.exec(html)) !== null) {
+    const tennisrecruiting_id = playerMatch[1]
+    const name = playerMatch[2].trim()
+    if (!name || name.length < 2) continue
+
+    const national_ranking = rankMatches[rankIndex] ?? 999
+    rankIndex++
+
+    players.push({
+      tennisrecruiting_id,
+      name,
+      national_ranking,
+      location: null,
+    })
+  }
+
+  return players
+}
+
+async function runTRBroadScan(): Promise<{ scanned: number }> {
+  // Get all tennisrecruiting_ids already in recruits table
+  const { data: existingRecruits } = await supabase
+    .from('recruits')
+    .select('tennisrecruiting_id')
+    .not('tennisrecruiting_id', 'is', null)
+  const recruitedIds = new Set(existingRecruits?.map(r => r.tennisrecruiting_id) || [])
+
+  // Get existing prospects to calculate rank movement
+  const { data: existingProspects } = await supabase
+    .from('scouting_prospects')
+    .select('tennisrecruiting_id, national_ranking')
+    .eq('source', 'tennisrecruiting')
+  const prospectRankMap = new Map(existingProspects?.map(p => [p.tennisrecruiting_id, p.national_ranking]) || [])
+
+  const toUpsert: Array<{
+    tennisrecruiting_id: string
+    name: string
+    national_ranking: number
+    previous_ranking: number
+    rank_movement: number
+    is_rising: boolean
+    class_year: number
+    location: string | null
+    nationality: string
+    source: string
+    last_synced_at: string
+  }> = []
+
+  for (const list of TR_LISTS) {
+    let seenCount = 0
+    for (let page = 1; page <= 10 && seenCount < 200; page++) {
+      const html = await fetchListPage(list.id, page)
+      if (!html) break
+      const players = parseListPagePlayers(html)
+      if (players.length < 3) break
+
+      for (const player of players) {
+        if (recruitedIds.has(player.tennisrecruiting_id)) continue
+        if (player.national_ranking > 200) continue
+
+        const prevRank = prospectRankMap.get(player.tennisrecruiting_id) ?? player.national_ranking
+        const movement = player.national_ranking - prevRank
+        const is_rising = movement <= -10
+
+        toUpsert.push({
+          tennisrecruiting_id: player.tennisrecruiting_id,
+          name: player.name,
+          national_ranking: player.national_ranking,
+          previous_ranking: prevRank,
+          rank_movement: movement,
+          is_rising,
+          class_year: list.classYear,
+          location: player.location || null,
+          nationality: 'USA',
+          source: 'tennisrecruiting',
+          last_synced_at: new Date().toISOString(),
+        })
+        seenCount++
+      }
+
+      await sleep(500)
+    }
+  }
+
+  if (toUpsert.length > 0) {
+    await supabase
+      .from('scouting_prospects')
+      .upsert(toUpsert, { onConflict: 'tennisrecruiting_id' })
+  }
+
+  return { scanned: toUpsert.length }
 }
 
 export async function GET(request: Request) {
@@ -177,6 +320,8 @@ export async function GET(request: Request) {
     await sleep(500)
   }
 
+  const scanResults = await runTRBroadScan()
+
   return NextResponse.json({
     success: true,
     run_at: new Date().toISOString(),
@@ -187,5 +332,6 @@ export async function GET(request: Request) {
       failed: results.failed,
     },
     details: results.details,
+    scan: scanResults,
   })
 }

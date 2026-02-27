@@ -34,6 +34,12 @@ export async function GET() {
       .select('*')
       .single()
 
+    // Get all scouting prospects not yet in the pipeline
+    const { data: prospects } = await supabase
+      .from('scouting_prospects')
+      .select('*')
+      .order('national_ranking', { ascending: true, nullsFirst: false })
+
     // Calculate UTR trend and ranking trend for each recruit
     const recruitsWithTrends = (recruits || []).map(recruit => {
       // ---- UTR trend ----
@@ -119,6 +125,7 @@ export async function GET() {
         risingStars,
         undercontacted,
         risingRankings,
+        notInPipeline: prospects || [],
       }
     })
   } catch (error) {
