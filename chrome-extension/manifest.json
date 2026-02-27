@@ -8,14 +8,18 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://tennisrecruiting.net/*"
+    "https://tennisrecruiting.net/*",
+    "https://www.tennisrecruiting.net/*"
   ],
   "content_scripts": [
     {
       "matches": [
         "https://tennisrecruiting.net/player/overview.asp*",
         "https://tennisrecruiting.net/player.asp*",
-        "https://tennisrecruiting.net/player/activity.asp*"
+        "https://tennisrecruiting.net/player/activity.asp*",
+        "https://www.tennisrecruiting.net/player/overview.asp*",
+        "https://www.tennisrecruiting.net/player.asp*",
+        "https://www.tennisrecruiting.net/player/activity.asp*"
       ],
       "js": ["content.js"]
     }
