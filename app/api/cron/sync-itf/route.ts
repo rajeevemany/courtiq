@@ -35,11 +35,25 @@ export async function GET(request: Request) {
   }
 
   // 1. Fetch ITF rankings
-  const res = await fetch(ITF_URL, { signal: AbortSignal.timeout(15000) })
+  const res = await fetch(ITF_URL, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': 'https://www.itftennis.com/en/rankings/world-tennis-tour-junior-rankings/?juniorRankingType=ITF',
+      'Origin': 'https://www.itftennis.com',
+    },
+    signal: AbortSignal.timeout(15000),
+  })
   if (!res.ok) {
     return NextResponse.json({ error: `ITF API returned ${res.status}` }, { status: 500 })
   }
-  const players: ITFPlayer[] = await res.json()
+  const text = await res.text()
+  if (!text.startsWith('[') && !text.startsWith('{')) {
+    console.error('ITF API returned non-JSON response:', text.slice(0, 500))
+    return NextResponse.json({ error: 'ITF API returned non-JSON response' }, { status: 500 })
+  }
+  const players: ITFPlayer[] = JSON.parse(text)
 
   // 2. Filter to allowed nationalities
   const filtered = players.filter(p => ALLOWED_NATIONALITIES.has(p.playerNationalityCode))
