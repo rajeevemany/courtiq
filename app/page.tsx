@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import AddRecruitForm from '@/app/components/AddRecruitForm'
 import SignOutButton from '@/app/components/SignOutButton'
+import ARMSExportButton from '@/app/components/ARMSExportButton'
 
 export const revalidate = 0
 
@@ -177,6 +178,7 @@ export default async function Home() {
                 {sorted.length} recruits · sorted by priority
               </p>
             </div>
+            <ARMSExportButton />
           </div>
 
           {/* TABLE HEADER */}

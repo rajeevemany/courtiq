@@ -6,6 +6,8 @@ import AIBriefButton from '@/app/components/AIBriefButton'
 import DocumentUpload from '@/app/components/DocumentUpload'
 import EditRecruitForm from '@/app/components/EditRecruitForm'
 import FitScoreCalculator from '@/app/components/FitScoreCalculator'
+import MatchResultsSection from '@/app/components/MatchResultsSection'
+import ScoutReportSection from '@/app/components/ScoutReportSection'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -175,6 +177,12 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
 
             {/* DOCUMENTS */}
             <DocumentUpload recruitId={recruit.id} />
+
+            {/* MATCH RESULTS */}
+            <MatchResultsSection recruitId={recruit.id} />
+
+            {/* SCOUT REPORT & OUTREACH */}
+            <ScoutReportSection recruitId={recruit.id} recruitName={recruit.name} />
 
           </div>
 
