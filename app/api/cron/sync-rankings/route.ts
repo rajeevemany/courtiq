@@ -192,9 +192,16 @@ async function runTRBroadScan(): Promise<{ scanned: number }> {
   }
 
   if (toUpsert.length > 0) {
-    await supabase
+    console.log('First prospect sample:', JSON.stringify(toUpsert[0]))
+    const { error: upsertError } = await supabase
       .from('scouting_prospects')
       .upsert(toUpsert, { onConflict: 'tennisrecruiting_id' })
+
+    if (upsertError) {
+      console.error('TR scan upsert error:', JSON.stringify(upsertError))
+    } else {
+      console.log('TR scan upsert success:', toUpsert.length, 'rows')
+    }
   }
 
   return { scanned: toUpsert.length }
