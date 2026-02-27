@@ -12,61 +12,40 @@ const ALLOWED_NATIONALITIES = new Set([
   'IND','HKG','SGP','HUN','SVK','ESP','FRA','ITA',
 ])
 
-const ITF_URL = 'https://www.itftennis.com/tennis/api/PlayerRankApi/GetPlayerRankings?circuitCode=JT&playerTypeCode=B&ageCategoryCode=&juniorRankingType=itf&take=500&skip=0&isOrderAscending=true'
-
 interface ITFPlayer {
   playerId: string
   playerFamilyName: string
   playerGivenName: string
   playerNationalityCode: string
-  playerNationality: string
-  birthYear: number
   rank: number
   rankMovement: number
-  tournamentsPlayed: number
-  points: number
-  profileLink: string
 }
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get('Authorization')
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+// POST /api/cron/sync-itf
+// Body: { players: ITFPlayer[] } — fetched client-side by the coach via /itf-import
+export async function POST(request: Request) {
+  let body: { players: ITFPlayer[] }
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  // 1. Fetch ITF rankings
-  const res = await fetch(ITF_URL, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Referer': 'https://www.itftennis.com/en/rankings/world-tennis-tour-junior-rankings/?juniorRankingType=ITF',
-      'Origin': 'https://www.itftennis.com',
-    },
-    signal: AbortSignal.timeout(15000),
-  })
-  const text = await res.text()
-  console.log('ITF response status:', res.status)
-  console.log('ITF response first 500 chars:', text.substring(0, 500))
-
-  if (!text.startsWith('[') && !text.startsWith('{')) {
-    return NextResponse.json({ error: 'ITF API returned non-JSON', preview: text.substring(0, 200) }, { status: 500 })
+  const { players } = body
+  if (!Array.isArray(players) || players.length === 0) {
+    return NextResponse.json({ error: 'Body must contain a non-empty players array' }, { status: 400 })
   }
 
-  const parsed = JSON.parse(text)
-  const players: ITFPlayer[] = Array.isArray(parsed) ? parsed : parsed.items || parsed
-
-  // 2. Filter to allowed nationalities
+  // Re-apply nationality filter server-side as a safety net
   const filtered = players.filter(p => ALLOWED_NATIONALITIES.has(p.playerNationalityCode))
 
-  // 3. Get existing ITF prospects for rank movement reference
+  // Get existing ITF prospects to calculate rank movement
   const { data: existingProspects } = await supabase
     .from('scouting_prospects')
     .select('itf_player_id, itf_ranking')
     .eq('source', 'itf')
   const prospectRankMap = new Map(existingProspects?.map(p => [p.itf_player_id, p.itf_ranking]) || [])
 
-  // 4. Build upsert records
   const toUpsert = filtered.map(p => {
     const prevRank = prospectRankMap.get(p.playerId) ?? p.rank
     const movement = p.rankMovement
@@ -82,7 +61,6 @@ export async function GET(request: Request) {
     }
   })
 
-  // 5. Upsert all (ON CONFLICT on itf_player_id)
   const { error } = await supabase
     .from('scouting_prospects')
     .upsert(toUpsert, { onConflict: 'itf_player_id' })
@@ -95,7 +73,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     run_at: new Date().toISOString(),
-    total_fetched: players.length,
+    total_received: players.length,
     after_filter: filtered.length,
     upserted: toUpsert.length,
   })
