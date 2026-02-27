@@ -1,5 +1,103 @@
 if (window.location.href.includes('tennisrecruiting.net/player')) {
 
+function showToast(message, isError) {
+  const existing = document.getElementById('courtiq-toast')
+  if (existing) existing.remove()
+
+  const toast = document.createElement('div')
+  toast.id = 'courtiq-toast'
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 90px;
+    right: 24px;
+    z-index: 9999999;
+    background: ${isError ? 'rgba(239,68,68,0.95)' : 'rgba(34,197,94,0.95)'};
+    color: white;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: opacity 0.3s;
+  `
+  toast.textContent = message
+  document.body.appendChild(toast)
+  setTimeout(() => {
+    toast.style.opacity = '0'
+    setTimeout(() => toast.remove(), 300)
+  }, 3000)
+}
+
+function createSyncButton() {
+  if (!window.location.href.includes('/player/activity.asp')) return
+  if (document.getElementById('courtiq-sync-btn')) return
+
+  const btn = document.createElement('div')
+  btn.id = 'courtiq-sync-btn'
+  btn.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 80px;
+      right: 24px;
+      z-index: 99999;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    ">
+      <button id="courtiq-sync-trigger" style="
+        background: #0f766e;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(15,118,110,0.4);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      ">
+        ↑ Sync Results to CourtIQ
+      </button>
+    </div>
+  `
+  document.body.appendChild(btn)
+
+  document.getElementById('courtiq-sync-trigger').addEventListener('click', async () => {
+    const trigger = document.getElementById('courtiq-sync-trigger')
+    const urlMatch = window.location.href.match(/[?&]id=(\d+)/)
+    if (!urlMatch) {
+      showToast('Could not find player ID in URL', true)
+      return
+    }
+
+    const tennisrecruiting_id = urlMatch[1]
+    const raw_html = document.body.innerHTML
+
+    trigger.textContent = 'Syncing...'
+    trigger.style.opacity = '0.7'
+
+    try {
+      const res = await fetch('https://courtiq-three.vercel.app/api/match-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tennisrecruiting_id, raw_html }),
+      })
+
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed')
+
+      showToast(`Results synced! (${json.fetched ?? 0} matches)`, false)
+    } catch (err) {
+      showToast('Sync failed: ' + (err.message || 'Unknown error'), true)
+    } finally {
+      trigger.textContent = '↑ Sync Results to CourtIQ'
+      trigger.style.opacity = '1'
+    }
+  })
+}
+
 function extractPlayerData() {
     const data = {}
 
@@ -315,8 +413,12 @@ function extractPlayerData() {
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', createButton)
+    document.addEventListener('DOMContentLoaded', () => {
+      createButton()
+      createSyncButton()
+    })
   } else {
     createButton()
+    createSyncButton()
   }
 }

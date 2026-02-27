@@ -14,7 +14,8 @@
     {
       "matches": [
         "https://tennisrecruiting.net/player/overview.asp*",
-        "https://tennisrecruiting.net/player.asp*"
+        "https://tennisrecruiting.net/player.asp*",
+        "https://tennisrecruiting.net/player/activity.asp*"
       ],
       "js": ["content.js"]
     }

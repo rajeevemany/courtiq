@@ -173,12 +173,77 @@ export async function GET(req: NextRequest) {
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/match-results  { recruit_id }
+// POST /api/match-results
+// Supports two modes:
+//   1. { recruit_id } — server-fetches TR and ITF pages
+//   2. { tennisrecruiting_id, raw_html } — uses HTML from chrome extension
+//      (recruit_id may be omitted; looked up via tennisrecruiting_id)
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  console.log('match-results POST body:', body)
-  const { recruit_id } = body
+  console.log('match-results POST body keys:', Object.keys(body))
+
+  const { recruit_id, tennisrecruiting_id, raw_html } = body
+
+  // ── Chrome-extension path: raw HTML provided, no server fetch needed ──────
+  if (raw_html) {
+    let resolvedRecruitId: string = recruit_id
+
+    if (!resolvedRecruitId && tennisrecruiting_id) {
+      const { data: found, error: findErr } = await supabase
+        .from('recruits')
+        .select('id')
+        .eq('tennisrecruiting_id', String(tennisrecruiting_id))
+        .single()
+
+      if (findErr || !found) {
+        return NextResponse.json(
+          { error: 'No recruit found with this tennisrecruiting_id' },
+          { status: 404 }
+        )
+      }
+      resolvedRecruitId = found.id
+    }
+
+    if (!resolvedRecruitId) {
+      return NextResponse.json(
+        { error: 'recruit_id or tennisrecruiting_id required' },
+        { status: 400 }
+      )
+    }
+
+    const parsed = parseTennisRecruitingHTML(raw_html)
+    console.log('Parsed TR matches from raw_html:', parsed.length)
+
+    if (parsed.length === 0) {
+      return NextResponse.json({ success: true, fetched: 0 })
+    }
+
+    const toUpsert = parsed.map(m => ({
+      ...m,
+      recruit_id: resolvedRecruitId,
+      source: 'tennisrecruiting',
+    }))
+
+    const { error: upsertErr } = await supabase
+      .from('match_results')
+      .upsert(toUpsert, {
+        onConflict: 'recruit_id,tournament_name,round,opponent_name',
+        ignoreDuplicates: true,
+      })
+
+    if (upsertErr) {
+      console.error('Upsert error:', upsertErr)
+      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, fetched: toUpsert.length })
+  }
+
+  // ── Server-fetch path: look up recruit and scrape TR + ITF ───────────────
+  if (!recruit_id) {
+    return NextResponse.json({ error: 'recruit_id required' }, { status: 400 })
+  }
 
   const { data: recruit, error: rErr } = await supabase
     .from('recruits')
