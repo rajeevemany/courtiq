@@ -77,13 +77,17 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
     if (!winAnchor && !lossAnchor) continue
 
     const isWin = !!winAnchor
+    const activeCell = (winAnchor ? cells[1] : cells[2])
     const anchorText = (winAnchor ?? lossAnchor)![1].trim()
 
-    // "Name (ranking)" → split into name and ranking number
+    // Opponent name is the anchor text directly (no ranking inside the tag)
     console.log('Opponent anchor text:', anchorText)
-    const nameRankMatch = /^(.+?)\s*\((\d+)\)\s*$/.exec(anchorText)
-    const opponentName    = nameRankMatch ? nameRankMatch[1].trim() : anchorText
-    const opponentRanking = nameRankMatch ? parseInt(nameRankMatch[2], 10) : undefined
+    const opponentName = anchorText
+
+    // Ranking appears after </a> in the cell: <a href="...">Name</a> (68)
+    const rankingInCell = /<\/a>[^(]*\((\d+)\)/.exec(activeCell)
+    const opponentRanking = rankingInCell ? parseInt(rankingInCell[1], 10) : undefined
+    console.log('Opponent ranking from cell:', opponentRanking)
 
     // Score is in col 3; strip any residual tags
     const score = cells[3].replace(/<[^>]+>/g, '').trim()
