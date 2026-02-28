@@ -80,6 +80,7 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
     const anchorText = (winAnchor ?? lossAnchor)![1].trim()
 
     // "Name (ranking)" → split into name and ranking number
+    console.log('Opponent anchor text:', anchorText)
     const nameRankMatch = /^(.+?)\s*\((\d+)\)\s*$/.exec(anchorText)
     const opponentName    = nameRankMatch ? nameRankMatch[1].trim() : anchorText
     const opponentRanking = nameRankMatch ? parseInt(nameRankMatch[2], 10) : undefined
