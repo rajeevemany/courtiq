@@ -245,6 +245,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = parseTennisRecruitingHTML(raw_html)
     console.log('Parsed TR matches from raw_html:', parsed.length)
+    console.log('Parsed matches:', JSON.stringify(parsed, null, 2))
 
     if (parsed.length === 0) {
       return NextResponse.json({ success: true, fetched: 0 })
