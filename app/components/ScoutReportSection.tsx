@@ -9,6 +9,14 @@ interface Props {
 
 type CopyKey = 'text' | 'email' | 'dm'
 
+function cleanText(text: string): string {
+  return text
+    .replace(/\*\*SCOUTING REPORT:\*\*/gi, '')
+    .replace(/\*\*OUTREACH:\*\*/gi, '')
+    .replace(/\*\*/g, '')
+    .trim()
+}
+
 export default function ScoutReportSection({ recruitId, recruitName }: Props) {
   const [loading, setLoading] = useState(false)
   const [scoutingNote, setScoutingNote] = useState('')
@@ -27,8 +35,8 @@ export default function ScoutReportSection({ recruitId, recruitName }: Props) {
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || 'Failed to generate')
-      setScoutingNote(data.scouting_note)
-      setOutreachMessage(data.outreach_message)
+      setScoutingNote(cleanText(data.scouting_note))
+      setOutreachMessage(cleanText(data.outreach_message))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate scout report')
     } finally {
