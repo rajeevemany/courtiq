@@ -35,7 +35,10 @@ export default function MatchResultsSection({ recruitId, recruitRanking }: Props
     try {
       const res = await fetch(`/api/match-results?recruit_id=${recruitId}`)
       const data = await res.json()
-      if (data.success) setResults(data.data ?? [])
+      if (data.success) {
+        console.log('match results:', data.data)
+        setResults(data.data ?? [])
+      }
     } finally {
       setLoading(false)
     }
