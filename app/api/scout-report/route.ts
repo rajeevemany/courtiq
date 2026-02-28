@@ -12,7 +12,7 @@ const anthropic = new Anthropic({
 })
 
 // Update this model ID as needed — user specified "claude-sonnet-4-20250514"
-const MODEL = 'claude-sonnet-4-5-20251001'
+const MODEL = 'claude-sonnet-4-5'
 
 export async function POST(req: Request) {
   try {
