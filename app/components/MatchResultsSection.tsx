@@ -35,9 +35,12 @@ export default function MatchResultsSection({ recruitId, recruitRanking }: Props
     try {
       const res = await fetch(`/api/match-results?recruit_id=${recruitId}`)
       const data = await res.json()
-      if (data.success) {
-        console.log('match results:', data.data)
-        setResults(data.data ?? [])
+      console.log('match results raw response:', data)
+      if (data.success && Array.isArray(data.data)) {
+        console.log(`loaded ${data.data.length} matches, first:`, data.data[0])
+        setResults(data.data)
+      } else if (!data.success) {
+        console.warn('match results API error:', data.error)
       }
     } finally {
       setLoading(false)
@@ -77,6 +80,18 @@ export default function MatchResultsSection({ recruitId, recruitRanking }: Props
 
   const wins   = results.filter(m => m.result === 'W').length
   const losses = results.filter(m => m.result === 'L').length
+
+  function roundStyle(round: string): string {
+    switch (round) {
+      case 'F':   return 'text-amber-400 font-bold'
+      case 'SF':  return 'text-orange-400 font-semibold'
+      case 'QF':  return 'text-violet-400 font-semibold'
+      case 'R16': return 'text-blue-400'
+      case 'R32': return 'text-sky-500'
+      case 'R64': return 'text-sky-600'
+      default:    return 'text-slate-500'
+    }
+  }
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -165,7 +180,7 @@ export default function MatchResultsSection({ recruitId, recruitRanking }: Props
                       <span className={`text-xs font-bold w-4 flex-shrink-0 ${m.result === 'W' ? 'text-green-400' : 'text-red-400'}`}>
                         {m.result}
                       </span>
-                      <span className="text-xs text-slate-500 w-8 flex-shrink-0">{m.round}</span>
+                      <span className={`text-xs w-8 flex-shrink-0 ${roundStyle(m.round)}`}>{m.round}</span>
                       <span className="flex-1 flex items-baseline gap-1 min-w-0">
                         <span className="text-white text-sm truncate">{m.opponent_name}</span>
                         {m.opponent_ranking && (
