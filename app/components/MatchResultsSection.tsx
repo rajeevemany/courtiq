@@ -9,6 +9,7 @@ interface MatchResult {
   surface: string | null
   round: string
   opponent_name: string
+  opponent_ranking: number | null
   opponent_nationality: string | null
   opponent_itf_id: string | null
   score: string | null
@@ -19,9 +20,10 @@ interface MatchResult {
 
 interface Props {
   recruitId: string
+  recruitRanking?: number | null
 }
 
-export default function MatchResultsSection({ recruitId }: Props) {
+export default function MatchResultsSection({ recruitId, recruitRanking }: Props) {
   const [results, setResults] = useState<MatchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
@@ -141,24 +143,46 @@ export default function MatchResultsSection({ recruitId }: Props) {
                 </span>
               </div>
               <div className="flex flex-col gap-1">
-                {tMatches.map((m) => (
-                  <div
-                    key={m.id}
-                    className="flex items-center gap-3 px-3 py-2 bg-white/3 border border-white/5 rounded-lg"
-                  >
-                    <span className={`text-xs font-bold w-4 flex-shrink-0 ${m.result === 'W' ? 'text-green-400' : 'text-red-400'}`}>
-                      {m.result}
-                    </span>
-                    <span className="text-xs text-slate-500 w-8 flex-shrink-0">{m.round}</span>
-                    <span className="text-sm text-slate-200 flex-1 truncate">{m.opponent_name}</span>
-                    {m.opponent_nationality && (
-                      <span className="text-xs text-slate-500 flex-shrink-0">{m.opponent_nationality}</span>
-                    )}
-                    {m.score && (
-                      <span className="text-xs font-mono text-slate-400 flex-shrink-0">{m.score}</span>
-                    )}
-                  </div>
-                ))}
+                {tMatches.map((m) => {
+                  const isQualityWin =
+                    m.result === 'W' &&
+                    m.opponent_ranking != null &&
+                    recruitRanking != null &&
+                    m.opponent_ranking < recruitRanking
+                  return (
+                    <div
+                      key={m.id}
+                      className="flex items-center gap-3 px-3 py-2 bg-white/3 border border-white/5 rounded-lg"
+                      style={{
+                        borderLeft: m.result === 'W'
+                          ? '3px solid rgba(74,222,128,0.5)'
+                          : '3px solid rgba(248,113,113,0.5)',
+                      }}
+                    >
+                      <span className={`text-xs font-bold w-4 flex-shrink-0 ${m.result === 'W' ? 'text-green-400' : 'text-red-400'}`}>
+                        {m.result}
+                      </span>
+                      <span className="text-xs text-slate-500 w-8 flex-shrink-0">{m.round}</span>
+                      <span className="flex-1 flex items-baseline gap-1 min-w-0">
+                        <span className="text-white text-sm truncate">{m.opponent_name}</span>
+                        {m.opponent_ranking && (
+                          <span className="text-slate-400 text-xs flex-shrink-0">(#{m.opponent_ranking})</span>
+                        )}
+                      </span>
+                      {isQualityWin && (
+                        <span className="text-xs font-semibold text-yellow-400 flex-shrink-0 flex items-center gap-1">
+                          ⭐ Quality Win
+                        </span>
+                      )}
+                      {m.opponent_nationality && (
+                        <span className="text-xs text-slate-500 flex-shrink-0">{m.opponent_nationality}</span>
+                      )}
+                      {m.score && (
+                        <span className="text-xs font-mono text-slate-400 flex-shrink-0">{m.score}</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}

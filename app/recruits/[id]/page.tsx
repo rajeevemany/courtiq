@@ -179,7 +179,7 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
             <DocumentUpload recruitId={recruit.id} />
 
             {/* MATCH RESULTS */}
-            <MatchResultsSection recruitId={recruit.id} />
+            <MatchResultsSection recruitId={recruit.id} recruitRanking={recruit.national_ranking} />
 
             {/* SCOUT REPORT & OUTREACH */}
             <ScoutReportSection recruitId={recruit.id} recruitName={recruit.name} />
