@@ -12,6 +12,7 @@ interface ParsedMatch {
   surface?: string
   round: string
   opponent_name: string
+  opponent_ranking?: number
   opponent_nationality?: string
   opponent_itf_id?: string | null
   score?: string
@@ -23,20 +24,24 @@ interface ParsedMatch {
 // TennisRecruiting HTML parser
 // Activity page: tennisrecruiting.net/player/activity.asp?id=...
 // Table structure: tournament header rows (<th class="doublewide">) followed
-// by match rows (<td class="c"> for round, player link, score, win/loss cols)
+// by 4-column match rows:
+//   col 0: <td class="c">ROUND</td>
+//   col 1: win column  — contains player <a> if this match was a Win, else &nbsp;
+//   col 2: loss column — contains player <a> if this match was a Loss, else &nbsp;
+//   col 3: <td nowrap="">SCORE</td>
+// Opponent anchor text format: "Name (ranking)"
 // ---------------------------------------------------------------------------
 function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
   const matches: ParsedMatch[] = []
   let currentTournament = ''
 
-  // Each <tr>…</tr> is a row; process them in order
   const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi
   let rowMatch: RegExpExecArray | null
 
   while ((rowMatch = rowRegex.exec(html)) !== null) {
     const row = rowMatch[1]
 
-    // Tournament header: <th … class="…doublewide…">Name</th>
+    // Tournament header: <th class="doublewide">Name</th>
     const headerMatch = /<th[^>]*class="[^"]*doublewide[^"]*"[^>]*>([\s\S]*?)<\/th>/i.exec(row)
     if (headerMatch) {
       currentTournament = headerMatch[1].replace(/<[^>]+>/g, '').trim()
@@ -45,36 +50,48 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
 
     if (!currentTournament) continue
 
-    // Round cell: <td class="c">R1</td>  (short uppercase round codes)
+    // Must have a round cell as col 0
     const roundMatch = /<td[^>]*class="[^"]*\bc\b[^"]*"[^>]*>\s*([A-Z0-9]{1,5})\s*<\/td>/i.exec(row)
     if (!roundMatch) continue
 
-    const round = roundMatch[1].trim()
+    const round = roundMatch[1].trim().toUpperCase()
     const validRounds = new Set(['R1','R2','R3','R4','R5','R64','R32','R16','QF','SF','F','W','RR'])
-    if (!validRounds.has(round.toUpperCase())) continue
+    if (!validRounds.has(round)) continue
 
-    // Opponent from player profile anchor: "Name (ranking)" or just "Name"
-    const opponentAnchor = /<a[^>]*href="[^"]*(?:player|profile)[^"]*"[^>]*>([^<]+)<\/a>/i.exec(row)
-    if (!opponentAnchor) continue
+    // Extract all <td> cells from this row
+    const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
+    cellRegex.lastIndex = 0
+    const cells: string[] = []
+    let cellMatch: RegExpExecArray | null
+    while ((cellMatch = cellRegex.exec(row)) !== null) {
+      cells.push(cellMatch[1])
+    }
 
-    const opponentText = opponentAnchor[1].trim()
-    const nameRankMatch = /^(.+?)\s*\(\d+\)\s*$/.exec(opponentText)
-    const opponentName = nameRankMatch ? nameRankMatch[1].trim() : opponentText
+    if (cells.length < 4) continue
 
-    // Score: look for tennis score patterns like "6-4 6-3" or "6-4 6-3(5)"
-    const scoreMatch = /\b(\d-\d(?:\(\d+\))?(?:\s+\d-\d(?:\(\d+\))?)+)\b/.exec(row)
-    const score = scoreMatch ? scoreMatch[1].trim() : ''
+    // col 1 = win column, col 2 = loss column
+    const playerAnchorRe = /<a[^>]*href="[^"]*player[^"]*"[^>]*>([^<]+)<\/a>/i
+    const winAnchor  = playerAnchorRe.exec(cells[1])
+    const lossAnchor = playerAnchorRe.exec(cells[2])
 
-    // W/L: check for non-empty win or loss cell
-    const isWin  = /<td[^>]*class="[^"]*(?:\bwin\b)[^"]*"[^>]*>\s*([^<\s][^<]*?)\s*<\/td>/i.test(row)
-    const isLoss = /<td[^>]*class="[^"]*(?:\bloss\b)[^"]*"[^>]*>\s*([^<\s][^<]*?)\s*<\/td>/i.test(row)
+    if (!winAnchor && !lossAnchor) continue
 
-    if (!isWin && !isLoss) continue
+    const isWin = !!winAnchor
+    const anchorText = (winAnchor ?? lossAnchor)![1].trim()
+
+    // "Name (ranking)" → split into name and ranking number
+    const nameRankMatch = /^(.+?)\s*\((\d+)\)\s*$/.exec(anchorText)
+    const opponentName    = nameRankMatch ? nameRankMatch[1].trim() : anchorText
+    const opponentRanking = nameRankMatch ? parseInt(nameRankMatch[2], 10) : undefined
+
+    // Score is in col 3; strip any residual tags
+    const score = cells[3].replace(/<[^>]+>/g, '').trim()
 
     matches.push({
       tournament_name: currentTournament,
-      round: round.toUpperCase(),
+      round,
       opponent_name: opponentName,
+      opponent_ranking: opponentRanking,
       score,
       result: isWin ? 'W' : 'L',
     })
