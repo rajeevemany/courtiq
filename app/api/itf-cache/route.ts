@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     .from('itf_players_cache')
     .upsert(rows, { onConflict: 'itf_player_id' })
 
-  console.log('Upsert error:', JSON.stringify(error), 'count:', (data as unknown[])?.length)
+  console.log('Upsert error:', JSON.stringify(error), 'count:', Array.isArray(data) ? data.length : 0)
 
   if (error) {
     console.error('itf-cache upsert error:', error)
