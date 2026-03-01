@@ -95,6 +95,14 @@ export default function ITFImportPage() {
       if (!Array.isArray(players) || players.length === 0) {
         throw new Error('Unexpected response shape — no player array found')
       }
+
+      // Fire-and-forget: cache all players for ITF auto-match feature
+      fetch('/api/itf-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ players }),
+      }).catch(err => console.warn('itf-cache background sync failed:', err))
+
       setTotalFetched(players.length)
       setAllPlayers(players.filter(p => ALLOWED_NATIONALITIES.has(p.playerNationalityCode)))
       setFetchStatus('fetched')
