@@ -1,4 +1,4 @@
-if (window.location.href.includes('tennisrecruiting.net/player')) {
+if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com')) {
 
 function showToast(message, isError) {
   const existing = document.getElementById('courtiq-toast')
@@ -98,6 +98,73 @@ function createSyncButton() {
   })
 }
 
+function createITFSyncButton() {
+  if (!window.location.href.includes('itftennis.com') || !window.location.href.includes('/activity')) return
+  if (document.getElementById('courtiq-itf-sync-btn')) return
+
+  // Extract numeric ITF player ID from URL segment: /en/players/name/800692786/nationality/...
+  const urlMatch = window.location.href.match(/\/en\/players\/[^/]+\/(\d+)\//)
+  if (!urlMatch) return
+  const itf_player_id = urlMatch[1]
+
+  const btn = document.createElement('div')
+  btn.id = 'courtiq-itf-sync-btn'
+  btn.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 99999;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    ">
+      <button id="courtiq-itf-sync-trigger" style="
+        background: #0f766e;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 20px rgba(15,118,110,0.4);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+      ">
+        ↑ Sync Results to CourtIQ
+      </button>
+    </div>
+  `
+  document.body.appendChild(btn)
+
+  document.getElementById('courtiq-itf-sync-trigger').addEventListener('click', async () => {
+    const trigger = document.getElementById('courtiq-itf-sync-trigger')
+    const raw_html = document.body.innerHTML
+
+    trigger.textContent = 'Syncing...'
+    trigger.style.opacity = '0.7'
+
+    try {
+      const res = await fetch('https://courtiq-three.vercel.app/api/match-results', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itf_player_id, raw_html, source: 'itf' }),
+      })
+
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed')
+
+      showToast(`ITF results synced! (${json.fetched ?? 0} matches)`, false)
+    } catch (err) {
+      showToast('Sync failed: ' + (err.message || 'Unknown error'), true)
+    } finally {
+      trigger.textContent = '↑ Sync Results to CourtIQ'
+      trigger.style.opacity = '1'
+    }
+  })
+}
+
 function extractPlayerData() {
     const data = {}
 
@@ -169,6 +236,7 @@ function extractPlayerData() {
   }
 
   function createButton() {
+    if (!window.location.href.includes('tennisrecruiting.net')) return
     if (document.getElementById('courtiq-btn')) return
 
     const btn = document.createElement('div')
@@ -416,9 +484,11 @@ function extractPlayerData() {
     document.addEventListener('DOMContentLoaded', () => {
       createButton()
       createSyncButton()
+      createITFSyncButton()
     })
   } else {
     createButton()
     createSyncButton()
+    createITFSyncButton()
   }
 }

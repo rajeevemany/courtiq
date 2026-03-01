@@ -108,65 +108,124 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
 // ---------------------------------------------------------------------------
 // ITF HTML parser
 // Activity page: itftennis.com/en/players/{slug}/{id}/{nat}/jt/s/activity
-// NOTE: ITF is Incapsula-protected. Server-side fetches may fail; the route
-// is implemented as requested and includes browser-like headers.
+// Processes HTML in document order: collects tournament-header events and
+// match-result events (by round-label position), sorts by position, then
+// emits ParsedMatch entries while tracking the current tournament context.
 // ---------------------------------------------------------------------------
 function parseITFHTML(html: string): ParsedMatch[] {
   const matches: ParsedMatch[] = []
 
-  // Helper: extract all matches of a pattern into an array of cleaned strings
-  function extractAll(re: RegExp): string[] {
-    const results: string[] = []
-    const global = new RegExp(re.source, 'gi')
-    let m: RegExpExecArray | null
-    while ((m = global.exec(html)) !== null) {
-      results.push(m[1].replace(/<[^>]+>/g, '').trim())
-    }
-    return results
+  interface TournEv {
+    pos: number; type: 'tournament'
+    name: string; grade?: string; surface?: string
+  }
+  interface MatchEv {
+    pos: number; type: 'match'
+    round: string; result: 'W' | 'L'
+    firstName: string; lastName: string
+    nationality?: string; player2Id?: string | null; score: string
+  }
+  type Ev = TournEv | MatchEv
+  const events: Ev[] = []
+
+  // ── Tournament headers: <h2 class="pprofile-activity-tournament__title"><a>NAME</a></h2> ──
+  const h2Re = /<h2[^>]*class="[^"]*pprofile-activity-tournament__title[^"]*"[^>]*>/gi
+  let h2m: RegExpExecArray | null
+  while ((h2m = h2Re.exec(html)) !== null) {
+    const start = h2m.index
+    const h2End = html.indexOf('</h2>', start)
+    if (h2End === -1) continue
+    const h2Block = html.substring(start, h2End + 5)
+    const aM = /<a[^>]*>([\s\S]*?)<\/a>/i.exec(h2Block)
+    const name = aM ? aM[1].replace(/<[^>]+>/g, '').trim() : ''
+    if (!name) continue
+
+    // Grade and surface appear in the tournament block just after the h2
+    const nearby = html.substring(h2End, h2End + 800)
+    const gradeM  = /<span[^>]*class="[^"]*pprofile-activity-widget__tournament-type[^"]*"[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>/i.exec(nearby)
+    const surfM   = /<span[^>]*class="[^"]*pprofile-activity-widget__surface[^"]*"[^>]*>[\s\S]*?<strong[^>]*>([\s\S]*?)<\/strong>/i.exec(nearby)
+    events.push({
+      pos: start, type: 'tournament', name,
+      grade:   gradeM ? gradeM[1].replace(/<[^>]+>/g, '').trim()  : undefined,
+      surface: surfM  ? surfM[1].replace(/<[^>]+>/g, '').trim()   : undefined,
+    })
   }
 
-  const rounds      = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__round-label--non-mobile[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const winLosses   = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__win-loss[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const grades      = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__tournament-type[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const surfaces    = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__surface[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const lastNames   = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__last-name[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const firstNames  = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__first-name[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
-  const scores      = extractAll(/<[^>]*class="[^"]*pprofile-activity-widget__score[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
+  // ── Match result blocks, keyed by non-mobile round label ─────────────────
+  const roundLabelRe = /<strong[^>]*class="[^"]*pprofile-activity-widget__round-label--non-mobile[^"]*"[^>]*>([\s\S]*?)<\/strong>/gi
+  let rlm: RegExpExecArray | null
+  while ((rlm = roundLabelRe.exec(html)) !== null) {
+    const blockStart = rlm.index
+    const round = rlm[1].replace(/<[^>]+>/g, '').trim()
 
-  // Tournament titles repeat per-match section; collect in order
-  const titles      = extractAll(/<[^>]*class="[^"]*pprofile-activity-tournament__title[^"]*"[^>]*>([\s\S]*?)<\/[^>]+>/)
+    // Slice this match's HTML block: from this round label to the start of the next
+    const nextRoundPos = html.indexOf('pprofile-activity-widget__round-label--non-mobile', blockStart + rlm[0].length)
+    const blockEnd = nextRoundPos > -1 ? nextRoundPos : blockStart + 3000
+    const block = html.substring(blockStart, blockEnd)
 
-  // Opponent nationalities from flag spans: <span class="itf-flags …" title="USA">
-  const natRegex = /<[^>]*class="[^"]*itf-flags[^"]*"[^>]*\s+title="([^"]+)"/gi
-  const nationalities: string[] = []
-  let nm: RegExpExecArray | null
-  while ((nm = natRegex.exec(html)) !== null) nationalities.push(nm[1].trim())
-
-  // Opponent ITF IDs from h2h links: …?player2Id=XXXXXXXX&…
-  const p2Regex = /[?&]player2Id=([^&"'\s]+)/gi
-  const player2Ids: string[] = []
-  let pm: RegExpExecArray | null
-  while ((pm = p2Regex.exec(html)) !== null) player2Ids.push(pm[1].trim())
-
-  const count = rounds.length
-  for (let i = 0; i < count; i++) {
-    const wl = winLosses[i]?.toUpperCase().trim()
+    // Win / Loss
+    const wlM = /<span[^>]*class="[^"]*pprofile-activity-widget__win-loss[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(block)
+    if (!wlM) continue
+    const wl = wlM[1].replace(/<[^>]+>/g, '').trim().toUpperCase()
     if (wl !== 'W' && wl !== 'L') continue
 
-    const opponentName = [firstNames[i], lastNames[i]].filter(Boolean).join(' ').trim()
-    if (!opponentName) continue
+    // Opponent names
+    const fnM = /<span[^>]*class="[^"]*pprofile-activity-widget__first-name[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(block)
+    const lnM = /<span[^>]*class="[^"]*pprofile-activity-widget__last-name[^"]*"[^>]*>([\s\S]*?)<\/span>/i.exec(block)
+    const firstName = fnM ? fnM[1].replace(/<[^>]+>/g, '').trim() : ''
+    const lastName  = lnM ? lnM[1].replace(/<[^>]+>/g, '').trim() : ''
+    if (!firstName && !lastName) continue
 
-    matches.push({
-      tournament_name: titles[i] || 'Unknown Tournament',
-      tournament_grade: grades[i] || undefined,
-      surface: surfaces[i] || undefined,
-      round: rounds[i] || '',
-      result: wl as 'W' | 'L',
-      opponent_name: opponentName,
-      opponent_nationality: nationalities[i] || undefined,
-      opponent_itf_id: player2Ids[i] || null,
-      score: scores[i] || '',
+    // Nationality from itf-flags--XXX class name
+    const natM = /class="[^"]*itf-flags--([a-z]{3})[^"]*"/i.exec(block)
+    const nationality = natM ? natM[1].toUpperCase() : undefined
+
+    // Opponent ITF ID from h2h player2Id URL param
+    const p2M = /[?&]player2Id=([^&"'\s]+)/i.exec(block)
+    const player2Id = p2M ? p2M[1].trim() : null
+
+    // Score: join all <li class="pprofile-activity-widget__score"> texts
+    const scoreLiRe = /<li[^>]*class="[^"]*pprofile-activity-widget__score[^"]*"[^>]*>([\s\S]*?)<\/li>/gi
+    const scoreParts: string[] = []
+    let slm: RegExpExecArray | null
+    while ((slm = scoreLiRe.exec(block)) !== null) {
+      const t = slm[1].replace(/<[^>]+>/g, '').trim()
+      if (t) scoreParts.push(t)
+    }
+
+    events.push({
+      pos: blockStart, type: 'match',
+      round, result: wl as 'W' | 'L',
+      firstName, lastName, nationality, player2Id,
+      score: scoreParts.join(' '),
     })
+  }
+
+  // ── Assemble in document order ────────────────────────────────────────────
+  events.sort((a, b) => a.pos - b.pos)
+
+  let currentTournament = 'Unknown Tournament'
+  let currentGrade: string | undefined
+  let currentSurface: string | undefined
+
+  for (const ev of events) {
+    if (ev.type === 'tournament') {
+      currentTournament = ev.name
+      currentGrade  = ev.grade
+      currentSurface = ev.surface
+    } else {
+      matches.push({
+        tournament_name: currentTournament,
+        tournament_grade: currentGrade,
+        surface: currentSurface,
+        round: ev.round,
+        result: ev.result,
+        opponent_name: [ev.firstName, ev.lastName].filter(Boolean).join(' '),
+        opponent_nationality: ev.nationality,
+        opponent_itf_id: ev.player2Id,
+        score: ev.score,
+      })
+    }
   }
 
   return matches
@@ -196,18 +255,74 @@ export async function GET(req: NextRequest) {
 
 // ---------------------------------------------------------------------------
 // POST /api/match-results
-// Supports two modes:
+// Modes:
 //   1. { recruit_id } — server-fetches TR and ITF pages
-//   2. { tennisrecruiting_id, raw_html } — uses HTML from chrome extension
-//      (recruit_id may be omitted; looked up via tennisrecruiting_id)
+//   2. { tennisrecruiting_id, raw_html } — TR HTML from chrome extension
+//   3. { itf_player_id, raw_html, source: 'itf' } — ITF HTML from chrome extension
+//      In modes 2 & 3 recruit_id may be omitted; looked up by external ID.
 // ---------------------------------------------------------------------------
 export async function POST(req: NextRequest) {
   const body = await req.json()
   console.log('match-results POST body keys:', Object.keys(body))
 
-  const { recruit_id, tennisrecruiting_id, raw_html } = body
+  const { recruit_id, tennisrecruiting_id, itf_player_id, raw_html, source } = body
 
-  // ── Chrome-extension path: raw HTML provided, no server fetch needed ──────
+  // ── Chrome-extension ITF path ─────────────────────────────────────────────
+  if (raw_html && source === 'itf') {
+    let resolvedRecruitId: string = recruit_id
+
+    if (!resolvedRecruitId && itf_player_id) {
+      const { data: found, error: findErr } = await supabase
+        .from('recruits')
+        .select('id')
+        .eq('itf_player_id', String(itf_player_id))
+        .single()
+
+      if (findErr || !found) {
+        return NextResponse.json(
+          { error: 'No recruit found with this itf_player_id' },
+          { status: 404 }
+        )
+      }
+      resolvedRecruitId = found.id
+    }
+
+    if (!resolvedRecruitId) {
+      return NextResponse.json(
+        { error: 'recruit_id or itf_player_id required' },
+        { status: 400 }
+      )
+    }
+
+    const parsed = parseITFHTML(raw_html)
+    console.log('Parsed ITF matches from raw_html:', parsed.length)
+
+    if (parsed.length === 0) {
+      return NextResponse.json({ success: true, fetched: 0 })
+    }
+
+    const toUpsert = parsed.map(m => ({
+      ...m,
+      recruit_id: resolvedRecruitId,
+      source: 'itf',
+    }))
+
+    const { error: upsertErr } = await supabase
+      .from('match_results')
+      .upsert(toUpsert, {
+        onConflict: 'recruit_id,tournament_name,round,opponent_name',
+        ignoreDuplicates: true,
+      })
+
+    if (upsertErr) {
+      console.error('Upsert error:', upsertErr)
+      return NextResponse.json({ error: upsertErr.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true, fetched: toUpsert.length })
+  }
+
+  // ── Chrome-extension TR path ──────────────────────────────────────────────
   if (raw_html) {
     let resolvedRecruitId: string = recruit_id
 
@@ -235,14 +350,9 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('HTML length:', raw_html.length)
-
-    // Look for key markers
     console.log('Has doublewide:', raw_html.includes('doublewide'))
     console.log('Has class="c":', raw_html.includes('class="c"'))
-    console.log('Has win class:', raw_html.includes('class="win"'))
-    console.log('Has loss class:', raw_html.includes('class="loss"'))
 
-    // Find the activity table section
     const activityIndex = raw_html.indexOf('doublewide')
     if (activityIndex > -1) {
       console.log('Activity section preview:', raw_html.substring(activityIndex - 100, activityIndex + 500))

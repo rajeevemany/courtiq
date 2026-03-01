@@ -9,7 +9,8 @@
   ],
   "host_permissions": [
     "https://tennisrecruiting.net/*",
-    "https://www.tennisrecruiting.net/*"
+    "https://www.tennisrecruiting.net/*",
+    "https://www.itftennis.com/*"
   ],
   "content_scripts": [
     {
@@ -19,7 +20,9 @@
         "https://tennisrecruiting.net/player/activity.asp*",
         "https://www.tennisrecruiting.net/player/overview.asp*",
         "https://www.tennisrecruiting.net/player.asp*",
-        "https://www.tennisrecruiting.net/player/activity.asp*"
+        "https://www.tennisrecruiting.net/player/activity.asp*",
+        "https://www.itftennis.com/en/players/*/jt/s/activity",
+        "https://www.itftennis.com/en/players/*/jt/s/activity/*"
       ],
       "js": ["content.js"]
     }

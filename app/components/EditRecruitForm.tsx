@@ -32,6 +32,8 @@ export default function EditRecruitForm({ recruit }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [autoDetecting, setAutoDetecting] = useState(false)
+  const [itfMatchMsg, setItfMatchMsg] = useState('')
   const [form, setForm] = useState({
     name: recruit.name || '',
     class_year: String(recruit.class_year || ''),
@@ -51,6 +53,30 @@ export default function EditRecruitForm({ recruit }: Props) {
     tennisrecruiting_id: recruit.tennisrecruiting_id || '',
     itf_player_id: recruit.itf_player_id || '',
   })
+
+  async function handleAutoDetectITF() {
+    setAutoDetecting(true)
+    setItfMatchMsg('')
+    try {
+      const res = await fetch('/api/recruits/match-itf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recruit_id: recruit.id }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error || 'Failed')
+      if (data.matched) {
+        setForm(f => ({ ...f, itf_player_id: data.itf_player_id }))
+        setItfMatchMsg(`Found: ${data.name}${data.ranking ? ` (#${data.ranking})` : ''}`)
+      } else {
+        setItfMatchMsg('Not found in ITF database')
+      }
+    } catch {
+      setItfMatchMsg('Error during auto-detect')
+    } finally {
+      setAutoDetecting(false)
+    }
+  }
 
   async function handleSave() {
     setLoading(true)
@@ -323,6 +349,19 @@ export default function EditRecruitForm({ recruit }: Props) {
                     placeholder="e.g. 100123456"
                     className={inputClass}
                   />
+                  <button
+                    type="button"
+                    onClick={handleAutoDetectITF}
+                    disabled={autoDetecting}
+                    className="mt-1.5 text-xs px-2.5 py-1 bg-teal-600/15 hover:bg-teal-600/25 text-teal-400 border border-teal-500/30 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {autoDetecting ? 'Detecting...' : '⚡ Auto-detect'}
+                  </button>
+                  {itfMatchMsg && (
+                    <p className={`text-xs mt-1 ${itfMatchMsg.startsWith('Found') ? 'text-green-400' : 'text-slate-400'}`}>
+                      {itfMatchMsg}
+                    </p>
+                  )}
                 </div>
               </div>
 

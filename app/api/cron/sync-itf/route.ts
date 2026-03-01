@@ -70,11 +70,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Upsert ALL received players (unfiltered) to the cache table for name-matching
+  const cacheRows = players.map(p => ({
+    itf_player_id: p.playerId,
+    name: `${p.playerGivenName} ${p.playerFamilyName}`,
+    nationality: p.playerNationalityCode,
+    ranking: p.rank,
+    rank_movement: p.rankMovement,
+    last_synced: new Date().toISOString(),
+  }))
+
+  const { error: cacheErr } = await supabase
+    .from('itf_players_cache')
+    .upsert(cacheRows, { onConflict: 'itf_player_id' })
+
+  if (cacheErr) {
+    console.error('ITF cache upsert error:', cacheErr)
+    // Non-fatal: log but don't fail the response
+  }
+
   return NextResponse.json({
     success: true,
     run_at: new Date().toISOString(),
     total_received: players.length,
     after_filter: filtered.length,
     upserted: toUpsert.length,
+    cache_upserted: cacheRows.length,
   })
 }
