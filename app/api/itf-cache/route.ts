@@ -25,6 +25,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'players array required' }, { status: 400 })
   }
 
+  console.log('ITF cache received players:', players.length)
+
   const rows = players.map((p: ITFPlayer) => ({
     itf_player_id: p.playerId,
     name: `${p.playerGivenName} ${p.playerFamilyName}`,
@@ -35,9 +37,13 @@ export async function POST(req: NextRequest) {
     last_synced: new Date().toISOString(),
   }))
 
-  const { error } = await supabase
+  console.log('First player sample:', JSON.stringify(rows[0]))
+
+  const { data, error } = await supabase
     .from('itf_players_cache')
     .upsert(rows, { onConflict: 'itf_player_id' })
+
+  console.log('Upsert error:', JSON.stringify(error), 'count:', (data as unknown[])?.length)
 
   if (error) {
     console.error('itf-cache upsert error:', error)
