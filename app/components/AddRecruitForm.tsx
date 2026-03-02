@@ -20,6 +20,7 @@ export default function AddRecruitForm() {
     fit_score: '50',
     utr_rating: '',
     tennisrecruiting_id: '',
+    itf_player_id: '',
   })
 
   async function handleSubmit() {
@@ -36,6 +37,7 @@ export default function AddRecruitForm() {
           fit_score: parseInt(form.fit_score) || 50,
           utr_rating: parseFloat(form.utr_rating) || null,
           tennisrecruiting_id: form.tennisrecruiting_id.trim() || null,
+          itf_player_id: form.itf_player_id.trim() || null,
           competing_schools: form.competing_schools
             ? form.competing_schools.split(',').map(s => s.trim())
             : [],
@@ -58,6 +60,7 @@ export default function AddRecruitForm() {
         fit_score: '50',
         utr_rating: '',
         tennisrecruiting_id: '',
+      itf_player_id: '',
       })
       router.refresh()
     } catch (err) {
@@ -264,6 +267,20 @@ export default function AddRecruitForm() {
                   value={form.tennisrecruiting_id}
                   onChange={e => setForm(f => ({ ...f, tennisrecruiting_id: e.target.value }))}
                   placeholder="e.g. 123456 (enables auto ranking sync)"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                />
+              </div>
+
+              {/* ITF PLAYER ID */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                  ITF Player ID <span className="text-slate-600 normal-case font-normal">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.itf_player_id || ''}
+                  onChange={e => setForm(f => ({ ...f, itf_player_id: e.target.value }))}
+                  placeholder="e.g. 800692786"
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
                 />
               </div>
