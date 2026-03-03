@@ -11,21 +11,17 @@
  *   npx tsx scripts/scrape-commitments.ts 2004 2026
  *
  * Prerequisites (run once):
- *   npm install -D playwright playwright-extra playwright-extra-plugin-stealth tsx
+ *   npm install -D playwright tsx
  *   npx playwright install chromium
  *
  * Reads CRON_SECRET from .env.local automatically.
  * Set HEADLESS=true as an env var for unattended runs: HEADLESS=true npx tsx ...
  */
 
-import { chromium } from 'playwright-extra'
+import { chromium } from 'playwright'
 import type { Page } from 'playwright'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const StealthPlugin = require('playwright-extra-plugin-stealth')
 import * as fs from 'fs'
 import * as path from 'path'
-
-chromium.use(StealthPlugin())
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -398,7 +394,9 @@ async function main() {
     args: [
       '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
+      '--disable-web-security',
     ],
+    ignoreDefaultArgs: ['--enable-automation'],
   })
 
   const ctx = await browser.newContext({
@@ -408,6 +406,11 @@ async function main() {
   })
 
   const page = await ctx.newPage()
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined })
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] })
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] })
+  })
   page.setDefaultTimeout(30_000)
 
   let grandUpserted = 0
