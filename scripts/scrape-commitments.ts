@@ -11,24 +11,29 @@
  *   npx tsx scripts/scrape-commitments.ts 2004 2026
  *
  * Prerequisites (run once):
- *   npm install -D playwright tsx
+ *   npm install -D playwright playwright-extra playwright-extra-plugin-stealth tsx
  *   npx playwright install chromium
  *
  * Reads CRON_SECRET from .env.local automatically.
  * Set HEADLESS=true as an env var for unattended runs: HEADLESS=true npx tsx ...
  */
 
-import { chromium } from 'playwright'
+import { chromium } from 'playwright-extra'
 import type { Page } from 'playwright'
+import StealthPlugin from 'playwright-extra-plugin-stealth'
 import * as fs from 'fs'
 import * as path from 'path'
+
+chromium.use(StealthPlugin())
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const API_URL = 'https://courtiq-three.vercel.app/api/admin/scrape-commitments'
 const BATCH_SIZE = 50
-const MIN_DELAY_MS = 500
-const MAX_DELAY_MS = 1500
+const MIN_LIST_DELAY_MS    =  500   // between list page loads
+const MAX_LIST_DELAY_MS    = 1500
+const MIN_PROFILE_DELAY_MS = 2000   // between player profile fetches
+const MAX_PROFILE_DELAY_MS = 4000
 const HEADLESS = process.env.HEADLESS === 'true'
 
 // ── Env reader ────────────────────────────────────────────────────────────────
@@ -58,8 +63,8 @@ function readEnvLocal(): Record<string, string> {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function randomDelay(): Promise<void> {
-  const ms = MIN_DELAY_MS + Math.floor(Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS))
+function randomDelay(min = MIN_LIST_DELAY_MS, max = MAX_LIST_DELAY_MS): Promise<void> {
+  const ms = min + Math.floor(Math.random() * (max - min))
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
@@ -181,6 +186,16 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
   }))
 }
 
+// ── Cloudflare detection ──────────────────────────────────────────────────────
+
+async function isCloudflareBlocked(page: Page): Promise<boolean> {
+  const title = await page.title().catch(() => '')
+  if (title.includes('Just a moment')) return true
+  const content = await page.content().catch(() => '')
+  if (content.includes('cf-browser-verification')) return true
+  return false
+}
+
 // ── Profile page scraping ─────────────────────────────────────────────────────
 
 interface ProfileData {
@@ -207,13 +222,35 @@ function emptyProfile(): ProfileData {
 }
 
 async function scrapeProfile(page: Page, playerId: string): Promise<ProfileData> {
-  try {
-    await page.goto(
-      `https://www.tennisrecruiting.net/player.asp?id=${playerId}`,
-      { waitUntil: 'domcontentloaded', timeout: 30_000 }
-    )
+  const url = `https://www.tennisrecruiting.net/player.asp?id=${playerId}`
 
-    // Extract HIGHEST RANKINGS table using real DOM
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+
+    // ── Cloudflare check — wait 30s and retry once if blocked ───────────────
+    if (await isCloudflareBlocked(page)) {
+      log(`\n  ⚠  Cloudflare detected for ${playerId} — waiting 30s then retrying…`)
+      await new Promise(resolve => setTimeout(resolve, 30_000))
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      if (await isCloudflareBlocked(page)) {
+        log(`  ✗  Still blocked after retry — skipping ${playerId}`)
+        return emptyProfile()
+      }
+    }
+
+    // ── Wait for HIGHEST RANKINGS content (10s timeout) ────────────────────
+    const hasRankings = await page
+      .locator('text=HIGHEST RANKINGS')
+      .first()
+      .isVisible({ timeout: 10_000 })
+      .catch(() => false)
+
+    if (!hasRankings) {
+      // Profile exists but has no rankings section (common for older/incomplete profiles)
+      return emptyProfile()
+    }
+
+    // ── Extract HIGHEST RANKINGS table using real DOM ──────────────────────
     const byYear = await page.evaluate((): Record<string, { ranking?: number; rpi?: number }> => {
       // Find the td cell that contains "HIGHEST RANKINGS"
       const allTds = Array.from(document.querySelectorAll('td'))
@@ -357,7 +394,10 @@ async function main() {
 
   const browser = await chromium.launch({
     headless: HEADLESS,
-    slowMo: 0,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+    ],
   })
 
   const ctx = await browser.newContext({
@@ -426,7 +466,7 @@ async function main() {
         const label = `${entry.name}`.slice(0, 28).padEnd(28)
         logInline(`  [${String(i + 1).padStart(3)}/${entries.length}] ${pct.toString().padStart(3)}%  ${label}  `)
 
-        await randomDelay()
+        await randomDelay(MIN_PROFILE_DELAY_MS, MAX_PROFILE_DELAY_MS)
         const profile = await scrapeProfile(page, entry.tennisrecruiting_id)
 
         const rankStr = profile.ranking_yr1 != null ? `#${profile.ranking_yr1}` : '—    '
