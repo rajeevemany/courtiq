@@ -20,7 +20,8 @@
 
 import { chromium } from 'playwright-extra'
 import type { Page } from 'playwright'
-import StealthPlugin from 'playwright-extra-plugin-stealth'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const StealthPlugin = require('playwright-extra-plugin-stealth')
 import * as fs from 'fs'
 import * as path from 'path'
 
