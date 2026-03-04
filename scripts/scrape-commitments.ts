@@ -108,56 +108,45 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
 
   if (!hasPlayers) return []
 
-  // Fixed-column parser — confirmed HTML structure per row:
-  //   td[0]: rating image  e.g. <img src="...6-starB.gif">
+  // Target only the ranked table — avoids picking up players from the featured
+  // photo section at the top of the page which shares the same link format.
+  //
+  // Confirmed column structure (td[0]–td[3] direct children only):
+  //   td[0]: rating img  e.g. <img src="...6-starB.gif">
   //   td[1]: <b><a href="/player.asp?id=XXXXX">S. Caldwell</a></b> (MI)
-  //   td[2]: div/conf text  e.g. "NCAA - Big 12" | "NCAA - Div. III"
+  //   td[2]: div/conf text  "NCAA - Big 12" | "NCAA - Div. III"
   //   td[3]: <a href="/team.asp?id=XXX">School Name</a>
-  const rows = await page.evaluate(() => {
-    const results: Array<{
-      id: string
-      name: string
-      rating: string | null
-      state: string | null
-      school: string | null
-      division: string | null
-      conference: string | null
-    }> = []
+  const rows = await page.$$eval('table.list tbody.oddeven tr', trs =>
+    trs.flatMap(row => {
+      // Direct children only — avoids double-counting nested tds
+      const tds = row.querySelectorAll(':scope > td')
+      if (tds.length < 4) return []
 
-    const playerRows = Array.from(document.querySelectorAll('tr')).filter(tr =>
-      tr.querySelector('a[href*="/player.asp?id="]')
-    )
-
-    for (const row of playerRows) {
-      const tds = row.querySelectorAll('td')
-      if (tds.length < 4) continue
-
-      // td[0]: rating — star count from image filename (e.g. "6-starB.gif" → "6-Star")
+      // td[0]: rating from image filename (e.g. "6-starB.gif" → "6-Star")
       const ratingSrc = tds[0].querySelector('img')?.getAttribute('src') ?? ''
       const ratingMatch = ratingSrc.match(/(\d+)-star/i)
       const rating = ratingMatch ? `${ratingMatch[1]}-Star` : null
 
-      // td[1]: player name link + state abbreviation in parens
+      // td[1]: player name link + state abbreviation in parens "(MI)"
       const nameLink = tds[1].querySelector<HTMLAnchorElement>('a[href*="/player.asp?id="]')
-      if (!nameLink) continue
+      if (!nameLink) return []
       const href = nameLink.getAttribute('href') ?? ''
       const idMatch = href.match(/\/player\.asp\?id=(\d+)/)
-      if (!idMatch) continue
+      if (!idMatch) return []
       const id = idMatch[1]
       const name = nameLink.textContent?.trim() ?? ''
-      if (!name) continue
+      if (!name) return []
       const stateMatch = tds[1].textContent?.match(/\(([A-Z]{2})\)/)
       const state = stateMatch ? stateMatch[1] : null
 
       // td[2]: "NCAA - Big 12" | "NCAA - Ivy League" | "NCAA - Div. III"
       const divConfText = tds[2].textContent?.trim() ?? ''
-      // Division: check Div. III before Div. II before Div. I (substring ordering)
+      // Check Div. III before Div. II before Div. I (each is a substring of the next)
       let division: string | null = null
       if (/Div\. III/i.test(divConfText))      division = 'D3'
       else if (/Div\. II/i.test(divConfText)) division = 'D2'
       else if (/Div\. I/i.test(divConfText))  division = 'D1'
-      // Conference: text after "NCAA - ", but only when it's a real conference name
-      // (not just the division marker like "Div. III")
+      // Conference: text after "NCAA - " unless it's just a division marker
       let conference: string | null = null
       const confMatch = divConfText.match(/NCAA\s*-\s*(.+)/i)
       if (confMatch) {
@@ -165,15 +154,13 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
         if (!/^Div\./i.test(confText)) conference = confText
       }
 
-      // td[3]: school name from anchor text
+      // td[3]: school name from anchor
       const schoolLink = tds[3].querySelector('a')
       const school = schoolLink?.textContent?.trim() ?? tds[3].textContent?.trim() ?? null
 
-      results.push({ id, name, rating, state, school, division, conference })
-    }
-
-    return results
-  })
+      return [{ id, name, rating, state, school, division, conference }]
+    })
+  )
 
   return rows.map(r => ({
     tennisrecruiting_id: r.id,
@@ -390,6 +377,9 @@ async function main() {
   log(`║  Headless: ${HEADLESS}${' '.repeat(43 - 10 - String(HEADLESS).length)}║`)
   log(`║  Batch   : ${BATCH_SIZE} players/upload${' '.repeat(43 - 22 - String(BATCH_SIZE).length)}║`)
   log(`╚${bar}╝`)
+  log('')
+  log('💡 To reset before a fresh run:')
+  log('   TRUNCATE TABLE junior_profiles;')
   log('')
 
   const browser = await chromium.launch({
