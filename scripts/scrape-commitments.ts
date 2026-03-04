@@ -68,9 +68,6 @@ function randomDelay(min = MIN_LIST_DELAY_MS, max = MAX_LIST_DELAY_MS): Promise<
 function log(msg: string) { console.log(msg) }
 function logInline(msg: string) { process.stdout.write(msg) }
 
-// Fired once per run to dump raw row HTML so we can verify parsing
-let debugRowsDone = false
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CommitmentEntry {
@@ -111,20 +108,11 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
 
   if (!hasPlayers) return []
 
-  // Debug: dump raw HTML of the first 3 player rows (once per run)
-  if (!debugRowsDone) {
-    debugRowsDone = true
-    const debugRows = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('tr'))
-        .filter(tr => tr.querySelector('a[href*="/player.asp?id="]'))
-        .slice(0, 3)
-        .map(tr => tr.outerHTML.replace(/\s+/g, ' ').trim())
-    )
-    log('\n[DEBUG] First 3 player rows HTML:')
-    debugRows.forEach((html, i) => log(`  [Row ${i + 1}] ${html}\n`))
-  }
-
-  // Run extraction inside browser context using real DOM
+  // Fixed-column parser — confirmed HTML structure per row:
+  //   td[0]: rating image  e.g. <img src="...6-starB.gif">
+  //   td[1]: <b><a href="/player.asp?id=XXXXX">S. Caldwell</a></b> (MI)
+  //   td[2]: div/conf text  e.g. "NCAA - Big 12" | "NCAA - Div. III"
+  //   td[3]: <a href="/team.asp?id=XXX">School Name</a>
   const rows = await page.evaluate(() => {
     const results: Array<{
       id: string
@@ -136,81 +124,50 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
       conference: string | null
     }> = []
 
-    const playerLinks = document.querySelectorAll<HTMLAnchorElement>('a[href*="/player.asp?id="]')
+    const playerRows = Array.from(document.querySelectorAll('tr')).filter(tr =>
+      tr.querySelector('a[href*="/player.asp?id="]')
+    )
 
-    for (const link of playerLinks) {
-      const href = link.href
+    for (const row of playerRows) {
+      const tds = row.querySelectorAll('td')
+      if (tds.length < 4) continue
+
+      // td[0]: rating — star count from image filename (e.g. "6-starB.gif" → "6-Star")
+      const ratingSrc = tds[0].querySelector('img')?.getAttribute('src') ?? ''
+      const ratingMatch = ratingSrc.match(/(\d+)-star/i)
+      const rating = ratingMatch ? `${ratingMatch[1]}-Star` : null
+
+      // td[1]: player name link + state abbreviation in parens
+      const nameLink = tds[1].querySelector<HTMLAnchorElement>('a[href*="/player.asp?id="]')
+      if (!nameLink) continue
+      const href = nameLink.getAttribute('href') ?? ''
       const idMatch = href.match(/\/player\.asp\?id=(\d+)/)
       if (!idMatch) continue
-
       const id = idMatch[1]
-      const name = link.textContent?.trim() ?? ''
-      if (!name || !id) continue
+      const name = nameLink.textContent?.trim() ?? ''
+      if (!name) continue
+      const stateMatch = tds[1].textContent?.match(/\(([A-Z]{2})\)/)
+      const state = stateMatch ? stateMatch[1] : null
 
-      const row = link.closest('tr')
-      if (!row) continue
-
-      const cells = Array.from(row.querySelectorAll('td')).map(td => td.textContent?.trim() ?? '')
-
-      // Rating: "5-Star", "4-Star" etc.
-      const rating = cells.find(c => /\d-Star/i.test(c)) ?? null
-
-      // State: look for 2-letter abbreviation in multiple formats:
-      //   - Standalone cell:   "FL"
-      //   - City+state cell:   "Miami, FL"
-      //   - Appended to name:  "John Smith, FL" (in the same <td> as the link)
-      let state: string | null = null
-
-      // Check every cell for "FL" or "City, FL" pattern
-      for (const c of cells) {
-        if (/^[A-Z]{2}$/.test(c)) { state = c; break }
-        const cityState = c.match(/,\s*([A-Z]{2})$/)
-        if (cityState) { state = cityState[1]; break }
-      }
-      // Fallback: state may be appended to the name in the same <td> as the link
-      if (!state) {
-        const nameCellText = link.closest('td')?.textContent?.trim() ?? ''
-        const afterName = nameCellText.slice(name.length).replace(/^[\s,]+/, '').trim()
-        if (/^[A-Z]{2}$/.test(afterName)) state = afterName
-      }
-
-      // Div/Conf: detect both "D1 / ACC" and "NCAA - Ivy League" patterns
-      const divConfText = cells.find(c =>
-        /D[123]\s*\//i.test(c) ||   // "D1 / ACC", "D2 / NAIA"
-        /^NCAA/i.test(c)             // "NCAA - Ivy League"
-      ) ?? null
-
+      // td[2]: "NCAA - Big 12" | "NCAA - Ivy League" | "NCAA - Div. III"
+      const divConfText = tds[2].textContent?.trim() ?? ''
+      // Division: check Div. III before Div. II before Div. I (substring ordering)
       let division: string | null = null
+      if (/Div\. III/i.test(divConfText))      division = 'D3'
+      else if (/Div\. II/i.test(divConfText)) division = 'D2'
+      else if (/Div\. I/i.test(divConfText))  division = 'D1'
+      // Conference: text after "NCAA - ", but only when it's a real conference name
+      // (not just the division marker like "Div. III")
       let conference: string | null = null
-      if (divConfText) {
-        if (divConfText.includes('/')) {
-          // "D1 / Ivy League"  or  "NCAA D1 / Ivy League"
-          const parts = divConfText.split('/')
-          const divMatch = (parts[0] ?? '').match(/D([123])/i)
-          if (divMatch) division = `D${divMatch[1]}`
-          conference = parts[1]?.trim() ?? null
-        } else {
-          // "NCAA - Ivy League" — conference after the dash
-          const dashIdx = divConfText.indexOf('-')
-          if (dashIdx !== -1) conference = divConfText.slice(dashIdx + 1).trim()
-        }
+      const confMatch = divConfText.match(/NCAA\s*-\s*(.+)/i)
+      if (confMatch) {
+        const confText = confMatch[1].trim()
+        if (!/^Div\./i.test(confText)) conference = confText
       }
 
-      // School: the cell that is NOT the div/conf cell, NOT rank/rating/state/name.
-      // Explicitly exclude the identified divConfText so "NCAA - Ivy League" can
-      // never leak into the school slot.
-      const firstName = name.split(' ')[0]
-      const school = cells.find(c =>
-        c !== divConfText &&         // never the div/conf cell
-        c.length > 4 &&
-        !c.includes(firstName) &&    // not the player name cell
-        !/\d-Star/i.test(c) &&       // not rating
-        !/^\d+$/.test(c) &&          // not a bare rank number
-        !/^[A-Z]{2}$/.test(c) &&     // not standalone state
-        !/,\s*[A-Z]{2}$/.test(c) &&  // not "City, ST"
-        !/^NCAA/i.test(c) &&          // not "NCAA - ..." (belt-and-suspenders)
-        !/D[123]\s*\//i.test(c)       // not "D1 / ..."
-      ) ?? null
+      // td[3]: school name from anchor text
+      const schoolLink = tds[3].querySelector('a')
+      const school = schoolLink?.textContent?.trim() ?? tds[3].textContent?.trim() ?? null
 
       results.push({ id, name, rating, state, school, division, conference })
     }
