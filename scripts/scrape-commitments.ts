@@ -68,6 +68,9 @@ function randomDelay(min = MIN_LIST_DELAY_MS, max = MAX_LIST_DELAY_MS): Promise<
 function log(msg: string) { console.log(msg) }
 function logInline(msg: string) { process.stdout.write(msg) }
 
+// Fired once per run to dump raw row HTML so we can verify parsing
+let debugRowsDone = false
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CommitmentEntry {
@@ -108,6 +111,19 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
 
   if (!hasPlayers) return []
 
+  // Debug: dump raw HTML of the first 3 player rows (once per run)
+  if (!debugRowsDone) {
+    debugRowsDone = true
+    const debugRows = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('tr'))
+        .filter(tr => tr.querySelector('a[href*="/player.asp?id="]'))
+        .slice(0, 3)
+        .map(tr => tr.outerHTML.replace(/\s+/g, ' ').trim())
+    )
+    log('\n[DEBUG] First 3 player rows HTML:')
+    debugRows.forEach((html, i) => log(`  [Row ${i + 1}] ${html}\n`))
+  }
+
   // Run extraction inside browser context using real DOM
   const rows = await page.evaluate(() => {
     const results: Array<{
@@ -139,31 +155,61 @@ async function scrapeListPage(page: Page, url: string): Promise<CommitmentEntry[
       // Rating: "5-Star", "4-Star" etc.
       const rating = cells.find(c => /\d-Star/i.test(c)) ?? null
 
-      // State: standalone 2-letter uppercase code
+      // State: look for 2-letter abbreviation in multiple formats:
+      //   - Standalone cell:   "FL"
+      //   - City+state cell:   "Miami, FL"
+      //   - Appended to name:  "John Smith, FL" (in the same <td> as the link)
       let state: string | null = null
+
+      // Check every cell for "FL" or "City, FL" pattern
       for (const c of cells) {
         if (/^[A-Z]{2}$/.test(c)) { state = c; break }
+        const cityState = c.match(/,\s*([A-Z]{2})$/)
+        if (cityState) { state = cityState[1]; break }
+      }
+      // Fallback: state may be appended to the name in the same <td> as the link
+      if (!state) {
+        const nameCellText = link.closest('td')?.textContent?.trim() ?? ''
+        const afterName = nameCellText.slice(name.length).replace(/^[\s,]+/, '').trim()
+        if (/^[A-Z]{2}$/.test(afterName)) state = afterName
       }
 
-      // Division / Conference: "D1 / ACC"
-      const divConfText = cells.find(c => /D[123]\s*\//.test(c)) ?? null
+      // Div/Conf: detect both "D1 / ACC" and "NCAA - Ivy League" patterns
+      const divConfText = cells.find(c =>
+        /D[123]\s*\//i.test(c) ||   // "D1 / ACC", "D2 / NAIA"
+        /^NCAA/i.test(c)             // "NCAA - Ivy League"
+      ) ?? null
+
       let division: string | null = null
       let conference: string | null = null
       if (divConfText) {
-        const parts = divConfText.split('/')
-        division = parts[0]?.trim() ?? null
-        conference = parts[1]?.trim() ?? null
+        if (divConfText.includes('/')) {
+          // "D1 / Ivy League"  or  "NCAA D1 / Ivy League"
+          const parts = divConfText.split('/')
+          const divMatch = (parts[0] ?? '').match(/D([123])/i)
+          if (divMatch) division = `D${divMatch[1]}`
+          conference = parts[1]?.trim() ?? null
+        } else {
+          // "NCAA - Ivy League" — conference after the dash
+          const dashIdx = divConfText.indexOf('-')
+          if (dashIdx !== -1) conference = divConfText.slice(dashIdx + 1).trim()
+        }
       }
 
-      // School: longest non-player, non-meta cell
+      // School: the cell that is NOT the div/conf cell, NOT rank/rating/state/name.
+      // Explicitly exclude the identified divConfText so "NCAA - Ivy League" can
+      // never leak into the school slot.
       const firstName = name.split(' ')[0]
       const school = cells.find(c =>
+        c !== divConfText &&         // never the div/conf cell
         c.length > 4 &&
-        !c.includes(firstName) &&
-        !/\d-Star/i.test(c) &&
-        !/D[123]\s*\//.test(c) &&
-        !/^\d+$/.test(c) &&
-        !/^[A-Z]{2}$/.test(c)
+        !c.includes(firstName) &&    // not the player name cell
+        !/\d-Star/i.test(c) &&       // not rating
+        !/^\d+$/.test(c) &&          // not a bare rank number
+        !/^[A-Z]{2}$/.test(c) &&     // not standalone state
+        !/,\s*[A-Z]{2}$/.test(c) &&  // not "City, ST"
+        !/^NCAA/i.test(c) &&          // not "NCAA - ..." (belt-and-suspenders)
+        !/D[123]\s*\//i.test(c)       // not "D1 / ..."
       ) ?? null
 
       results.push({ id, name, rating, state, school, division, conference })
@@ -455,6 +501,12 @@ async function main() {
       if (entries.length === 0) {
         log(`  ⚠  No players found for ${year} — skipping`)
         continue
+      }
+
+      // Cap at top 200 (list is already sorted by rank, so we keep the best players)
+      if (entries.length > 200) {
+        log(`  ⚡ Filtering to top 200 players (skipping ${entries.length - 200} players)`)
+        entries.splice(200)
       }
 
       log(`\n  ✓ ${entries.length} unique players — fetching profiles…`)
