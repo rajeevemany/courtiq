@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     // Build prompt text
     const promptText = `You are a college tennis recruiting assistant. Write a 4-5 sentence AI brief for a busy coach preparing for a call or evaluation.
 
-Use the structured recruit data below AND any uploaded documents (scouting reports, tournament draws, match results, emails) to write a brief that covers:
+Use the structured recruit data below AND any uploaded documents (scouting reports, tournament draws, match results, emails, images, Word docs, and video notes) to write a brief that covers:
 - Player's current ranking and recent results
 - Key strengths and any concerns
 - Fit with the program and competing schools
@@ -76,13 +76,31 @@ ${recruit.notes || 'No scouting notes added yet.'}
 INTERACTION HISTORY:
 ${interactionSummary}`
 
-    // Build content blocks — PDF documents first, then the text prompt
+    // Build content blocks — documents first, then the text prompt
     const contentBlocks: Anthropic.MessageParam['content'] = []
 
-    for (const doc of documents ?? []) {
-      if (doc.type !== 'application/pdf') continue
+    const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    const WORD_TYPES = [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]
+    const VIDEO_TYPES = ['video/mp4', 'video/quicktime']
 
+    for (const doc of documents ?? []) {
       try {
+        const isVideo =
+          VIDEO_TYPES.includes(doc.type) ||
+          doc.storage_path.includes('youtube') ||
+          doc.storage_path.includes('hudl')
+
+        if (isVideo) {
+          contentBlocks.push({
+            type: 'text',
+            text: `Video available: ${doc.name} (${doc.storage_path}). Coach has uploaded a video file for this recruit — flag this in the brief as recommended viewing before making a final evaluation.`,
+          })
+          continue
+        }
+
         const { data: signedData } = await supabase.storage
           .from('recruit-documents')
           .createSignedUrl(doc.storage_path, 60)
@@ -92,15 +110,38 @@ ${interactionSummary}`
         const res = await fetch(signedData.signedUrl)
         if (!res.ok) continue
 
-        const buffer = await res.arrayBuffer()
-        const base64 = Buffer.from(buffer).toString('base64')
-
-        contentBlocks.push({
-          type: 'document',
-          source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 },
-        })
+        if (doc.type === 'application/pdf') {
+          const base64 = Buffer.from(await res.arrayBuffer()).toString('base64')
+          contentBlocks.push({
+            type: 'document',
+            source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 },
+          })
+        } else if (IMAGE_TYPES.includes(doc.type)) {
+          const base64 = Buffer.from(await res.arrayBuffer()).toString('base64')
+          contentBlocks.push({
+            type: 'image',
+            source: {
+              type: 'base64' as const,
+              media_type: doc.type as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+              data: base64,
+            },
+          })
+        } else if (WORD_TYPES.includes(doc.type)) {
+          const mammoth = await import('mammoth')
+          const result = await mammoth.extractRawText({ buffer: Buffer.from(await res.arrayBuffer()) })
+          const text = result.value
+          if (text.trim()) {
+            contentBlocks.push({ type: 'text', text: `Document: ${doc.name}\n\n${text}` })
+          }
+        } else if (doc.type === 'text/plain') {
+          const text = await res.text()
+          if (text.trim()) {
+            contentBlocks.push({ type: 'text', text: `Document: ${doc.name}\n\n${text}` })
+          }
+        }
+        // Unrecognized types are silently skipped
       } catch {
-        // Skip documents that fail to fetch
+        // Skip documents that fail to fetch or process
       }
     }
 
