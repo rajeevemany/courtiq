@@ -141,7 +141,7 @@ function parseHeightYear(text: string): { height: string | null; year_in_school:
  * We find the <strong>/<b> whose text matches the label, then grab the
  * immediately following text node (or sibling element text).
  */
-function extractLabel($: cheerio.CheerioAPI, $card: cheerio.Cheerio<cheerio.AnyNode>, label: string): string | null {
+function extractLabel($: cheerio.CheerioAPI, $card: cheerio.Cheerio<any>, label: string): string | null {
   let value: string | null = null;
 
   $card.find('strong, b').each((_, el) => {
@@ -149,7 +149,7 @@ function extractLabel($: cheerio.CheerioAPI, $card: cheerio.Cheerio<cheerio.AnyN
       // Try next sibling text node first
       const next = el.nextSibling;
       if (next && next.type === 'text') {
-        const v = (next as cheerio.TextNode).data?.trim();
+        const v = (el as any).nextSibling?.data?.trim();
         if (v) { value = v; return false; }
       }
       // Try next element sibling
