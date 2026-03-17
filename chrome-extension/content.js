@@ -1,4 +1,4 @@
-if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com')) {
+if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com') || window.location.href.includes('tennisrecruiting.net/list.asp')) {
 
 function showToast(message, isError) {
   const existing = document.getElementById('courtiq-toast')
@@ -480,15 +480,173 @@ function extractPlayerData() {
     })
   }
 
+  function createRankingsCaptureButton() {
+    if (!window.location.href.includes('/list.asp')) return
+    if (document.getElementById('courtiq-rankings-btn')) return
+
+    const LIST_ID_TO_YEAR = {
+      '1255': 2025,
+      '1265': 2026,
+      '1275': 2027,
+      '1285': 2028,
+    }
+    const urlId = new URLSearchParams(window.location.search).get('id') || ''
+    const grad_year = LIST_ID_TO_YEAR[urlId] || null
+
+    const btn = document.createElement('div')
+    btn.id = 'courtiq-rankings-btn'
+    btn.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 160px;
+        right: 24px;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      ">
+        <div id="courtiq-capture-status" style="display:none;background:rgba(0,0,0,0.8);color:white;padding:6px 12px;border-radius:8px;font-size:12px;"></div>
+        <button id="courtiq-capture-trigger" style="
+          background: #16a34a;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(22,163,74,0.4);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        ">
+          ✦ Capture Rankings
+        </button>
+      </div>
+    `
+    document.body.appendChild(btn)
+
+    document.getElementById('courtiq-capture-trigger').addEventListener('click', async () => {
+      const trigger = document.getElementById('courtiq-capture-trigger')
+      const statusEl = document.getElementById('courtiq-capture-status')
+
+      const CLASS_YEAR_ABBREVS = new Set(['SR', 'JR', 'FR', 'SO'])
+      const players = []
+
+      const links = document.querySelectorAll('a[href*="player.asp?id="]')
+      for (const link of links) {
+        const idMatch = link.getAttribute('href').match(/id=(\d+)/)
+        if (!idMatch) continue
+
+        const tennisrecruiting_id = idMatch[1]
+        const name = link.innerText.trim()
+        if (!name) continue
+
+        const row = link.closest('tr')
+        if (!row) continue
+
+        const cells = Array.from(row.querySelectorAll('td'))
+
+        let ranking = 0
+        let rating = null
+        let state = null
+        let committed_school = null
+
+        for (const cell of cells) {
+          const text = cell.innerText.trim()
+
+          if (!ranking && /^\d+$/.test(text)) {
+            const n = parseInt(text)
+            if (n >= 1 && n <= 500) ranking = n
+          }
+
+          if (!rating && /^\d-Star$/i.test(text)) {
+            rating = text
+          }
+          if (!rating) {
+            const img = cell.querySelector('img')
+            if (img && /^\d-Star$/i.test(img.alt || '')) rating = img.alt
+          }
+
+          if (!state && /^[A-Z]{2}$/.test(text) && !CLASS_YEAR_ABBREVS.has(text)) {
+            state = text
+          }
+        }
+
+        const knownValues = new Set([String(ranking), rating, state, name].filter(Boolean))
+        for (const cell of cells) {
+          const text = cell.innerText.trim()
+          if (
+            text.length >= 3 &&
+            /[a-zA-Z]/.test(text) &&
+            !knownValues.has(text) &&
+            !/^\d+$/.test(text) &&
+            !/^\d-Star$/i.test(text) &&
+            !/^[A-Z]{2}$/.test(text) &&
+            text !== name
+          ) {
+            committed_school = text
+            break
+          }
+        }
+
+        if (!ranking) continue
+
+        players.push({ tennisrecruiting_id, name, ranking, rating, state, committed_school })
+      }
+
+      if (players.length === 0) {
+        showToast('No players found on this page', true)
+        return
+      }
+
+      statusEl.style.display = 'block'
+      statusEl.textContent = `Capturing ${players.length} players...`
+      trigger.style.opacity = '0.7'
+      trigger.textContent = 'Capturing...'
+
+      const API_BASE = 'http://localhost:3000'
+      try {
+        const res = await fetch(`${API_BASE}/api/tr-scout/ingest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            players,
+            snapshot_date: new Date().toISOString().split('T')[0],
+            grad_year,
+          }),
+        })
+
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed')
+
+        statusEl.textContent = `✓ ${json.saved ?? players.length} players captured`
+        showToast(`✓ ${json.saved ?? players.length} players captured`, false)
+      } catch (err) {
+        statusEl.textContent = `✗ Error: ${err.message || 'Unknown error'}`
+        showToast('Capture failed: ' + (err.message || 'Unknown error'), true)
+      } finally {
+        trigger.textContent = '✦ Capture Rankings'
+        trigger.style.opacity = '1'
+        setTimeout(() => { statusEl.style.display = 'none' }, 4000)
+      }
+    })
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       createButton()
       createSyncButton()
       createITFSyncButton()
+      if (window.location.href.includes('/list.asp')) createRankingsCaptureButton()
     })
   } else {
     createButton()
     createSyncButton()
     createITFSyncButton()
+    if (window.location.href.includes('/list.asp')) createRankingsCaptureButton()
   }
 }

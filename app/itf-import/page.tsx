@@ -7,9 +7,12 @@ const ALLOWED_NATIONALITIES = new Set([
   'USA','GBR','AUS','CAN','NZL','IRL','RSA','BAH',
   'SUI','SWE','NOR','DEN','NED','GER','AUT','FIN','BEL',
   'IND','HKG','SGP','HUN','SVK','ESP','FRA','ITA',
+  'ROU','CZE','MAR','ECU','PER','LAT','LTV','ISR',
+  'BRA','ARG','CHI','COL','MEX','JPN','KOR','TPE',
+  'CRO','SRB','POL','POR','GRE','TUR','UKR',
 ])
 
-const ITF_URL = 'https://www.itftennis.com/tennis/api/PlayerRankApi/GetPlayerRankings?circuitCode=JT&playerTypeCode=B&ageCategoryCode=&juniorRankingType=itf&take=500&skip=0&isOrderAscending=true'
+const ITF_URL = 'https://www.itftennis.com/tennis/api/PlayerRankApi/GetPlayerRankings?circuitCode=JT&playerTypeCode=B&ageCategoryCode=&juniorRankingType=itf&take=600&skip=0&isOrderAscending=true'
 
 // Threshold values: -1 = no filter, otherwise filter to rankMovement <= -threshold
 const MOVEMENT_OPTIONS = [

@@ -15,6 +15,7 @@ export default function AIBriefButton({ recruitId, existingBrief, existingBriefD
   const [error, setError] = useState<string | null>(null)
 
   async function generateBrief() {
+    console.log('[AIBriefButton] clicked, posting to /api/brief for recruit:', recruitId)
     setLoading(true)
     setError(null)
 
@@ -33,7 +34,7 @@ export default function AIBriefButton({ recruitId, existingBrief, existingBriefD
       setBriefDate(new Date().toISOString())
     } catch (err) {
       console.error(err)
-      setError('Failed to generate brief. Check your OpenAI API key.')
+      setError('Failed to generate brief. Check your Anthropic API key.')
     } finally {
       setLoading(false)
     }

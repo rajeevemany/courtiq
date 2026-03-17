@@ -1,17 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import Anthropic from '@anthropic-ai/sdk'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-})
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export async function POST(request: Request) {
+  console.log('[brief] route hit - version 2')
   try {
     const { recruit_id } = await request.json()
 
@@ -31,6 +30,16 @@ export async function POST(request: Request) {
       .eq('recruit_id', recruit_id)
       .order('date', { ascending: false })
 
+    // Fetch most recent documents (up to 5)
+    const { data: documents } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('recruit_id', recruit_id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    console.log('[brief] documents found:', documents?.length ?? 0, documents?.map(d => d.name))
+
     // Build interaction summary
     const interactionSummary = interactions && interactions.length > 0
       ? interactions.map(i =>
@@ -38,8 +47,16 @@ export async function POST(request: Request) {
         ).join('\n')
       : 'No interactions logged yet.'
 
-    // Build the prompt
-    const prompt = `You are an assistant helping a college tennis coach evaluate a recruit. Based on the following information, write a concise, coach-ready brief of 3-4 sentences. Focus on playing identity, program fit, relationship status, and any risks or open questions. Be direct and practical — this is for a busy coach, not a report.
+    // Build prompt text
+    const promptText = `You are a college tennis recruiting assistant. Write a 4-5 sentence AI brief for a busy coach preparing for a call or evaluation.
+
+Use the structured recruit data below AND any uploaded documents (scouting reports, tournament draws, match results, emails) to write a brief that covers:
+- Player's current ranking and recent results
+- Key strengths and any concerns
+- Fit with the program and competing schools
+- Recommended next action
+
+Be specific — reference actual results, rankings, or details from the documents if available. Write in plain prose, no headers or bullets.
 
 RECRUIT INFORMATION:
 Name: ${recruit.name}
@@ -57,18 +74,51 @@ SCOUTING NOTES:
 ${recruit.notes || 'No scouting notes added yet.'}
 
 INTERACTION HISTORY:
-${interactionSummary}
+${interactionSummary}`
 
-Write the brief now. Do not use headers or bullet points. Write in plain prose as if briefing the head coach before a call.`
+    // Build content blocks — PDF documents first, then the text prompt
+    type ContentBlock =
+      | { type: 'document'; source: { type: 'base64'; media_type: string; data: string } }
+      | { type: 'text'; text: string }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
-      temperature: 0.7,
+    const contentBlocks: ContentBlock[] = []
+
+    for (const doc of documents ?? []) {
+      if (doc.type !== 'application/pdf') continue
+
+      try {
+        const { data: signedData } = await supabase.storage
+          .from('recruit-documents')
+          .createSignedUrl(doc.storage_path, 60)
+
+        if (!signedData?.signedUrl) continue
+
+        const res = await fetch(signedData.signedUrl)
+        if (!res.ok) continue
+
+        const buffer = await res.arrayBuffer()
+        const base64 = Buffer.from(buffer).toString('base64')
+
+        contentBlocks.push({
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+        })
+      } catch {
+        // Skip documents that fail to fetch
+      }
+    }
+
+    contentBlocks.push({ type: 'text', text: promptText })
+
+    console.log('[brief] content block types:', contentBlocks.map((b: any) => b.type))
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 512,
+      messages: [{ role: 'user', content: contentBlocks }],
     })
 
-    const brief = completion.choices[0].message.content
+    const brief = message.content[0].type === 'text' ? message.content[0].text : null
 
     // Save the brief back to the recruit record
     await supabase
@@ -78,7 +128,7 @@ Write the brief now. Do not use headers or bullet points. Write in plain prose a
 
     return NextResponse.json({ success: true, brief })
   } catch (error) {
-    console.error(error)
+    console.error('[brief] error:', error)
     return NextResponse.json(
       { success: false, error: 'Failed to generate brief' },
       { status: 500 }
