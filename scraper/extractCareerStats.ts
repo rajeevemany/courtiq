@@ -160,6 +160,8 @@ export function parseSidearmBio(html: string, sourceUrl: string): CareerStats {
     career_doubles_overall: careerDoublesOverall,
     career_doubles_dual:    null,
     ita_rank_peak_career:   peakCareer,
+    honors:                 null,
+    career_summary:         null,
   };
 }
 
@@ -259,6 +261,8 @@ export function parseWMTBio(html: string, sourceUrl: string): CareerStats {
     career_doubles_overall: sumWL('doubles_overall'),
     career_doubles_dual:    null,
     ita_rank_peak_career:   peakCareer,
+    honors:                 null,
+    career_summary:         null,
   };
 }
 
@@ -303,5 +307,7 @@ export async function extractCareerStats(profileUrl: string): Promise<CareerStat
     career_doubles_overall: null,
     career_doubles_dual:    null,
     ita_rank_peak_career:   null,
+    honors:                 null,
+    career_summary:         null,
   };
 }
