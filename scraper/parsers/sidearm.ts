@@ -99,7 +99,7 @@ export function parseSidearmRoster(html: string, baseUrl: string): SidearmPlayer
     if (!player.last_school) {
       // Look for a text node / span that follows "Last School" label
       const text = $container.text();
-      const lastSchoolMatch = text.match(/Last School\s+(.+?)(?:Full Bio|$)/s);
+      const lastSchoolMatch = text.match(/Last School\s+([\s\S]+?)(?:Full Bio|$)/);
       if (lastSchoolMatch) {
         player.last_school = lastSchoolMatch[1].trim().split('\n')[0].trim();
       }
