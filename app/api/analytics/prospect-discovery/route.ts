@@ -86,7 +86,19 @@ export async function GET() {
 
     const latestDate = latestSnap?.[0]?.snapshot_date ?? null
 
-    let eligibleProspects: object[] = []
+interface EligibleProspect {
+  id: string
+  name: string
+  national_ranking: number | null
+  nationality: string | null
+  location: string | null
+  high_school: string | null
+  fit_score: number | null
+  grad_year: number | null
+  utr_rating: number | null
+}
+
+    let eligibleProspects: EligibleProspect[] = []
 
     if (latestDate) {
       const { data: snapProspects } = await supabase
