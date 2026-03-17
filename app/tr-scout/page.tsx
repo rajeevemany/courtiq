@@ -18,11 +18,23 @@ interface TRPlayer {
   previous_school?: string | null
 }
 
+interface TRCommitment {
+  tennisrecruiting_id: string
+  name: string
+  committed_school: string
+  grad_year?: number | null
+  state?: string | null
+  rating?: string | null
+  in_pipeline: boolean
+  recruit_id?: string | null
+}
+
 interface MovementsData {
   rising: TRPlayer[]
   entered_top30: TRPlayer[]
   newly_uncommitted: TRPlayer[]
   top30_uncommitted: TRPlayer[]
+  newly_committed: TRCommitment[]
   snapshot_dates: { current: string | null; previous: string | null }
 }
 
@@ -229,6 +241,83 @@ function Section({
   )
 }
 
+function CommitmentCard({ player }: { player: TRCommitment }) {
+  const initials = player.name
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .slice(0, 2)
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
+      {/* Avatar */}
+      <div className="w-8 h-8 rounded-full bg-amber-900/40 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-300 flex-shrink-0">
+        {initials}
+      </div>
+
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href={`https://www.tennisrecruiting.net/player.asp?id=${player.tennisrecruiting_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-sm hover:text-amber-300 transition-colors"
+          >
+            {player.name}
+          </a>
+          {player.in_pipeline && (
+            <span className="inline-flex items-center text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 px-1.5 py-0.5 rounded">
+              ⚠ In Your Pipeline
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-sm font-semibold text-amber-300">→ {player.committed_school}</span>
+          {player.rating && (
+            <span className="text-xs text-slate-400">{player.rating}</span>
+          )}
+          {player.state && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.state}</span>
+          )}
+          {player.grad_year && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.grad_year}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CommitmentsSection({ players }: { players: TRCommitment[] }) {
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400">✦</span>
+          <h2 className="font-semibold">Newly Committed</h2>
+          <span className="ml-auto text-xs font-mono text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
+            {players.length}
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5">Players who committed to a school since last capture</p>
+      </div>
+
+      {players.length === 0 ? (
+        <div className="px-5 py-6 text-center text-slate-500 text-sm">
+          No new commitments since last capture
+        </div>
+      ) : (
+        <div>
+          {players.map(p => (
+            <CommitmentCard key={p.tennisrecruiting_id} player={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TRScoutPage() {
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'fetching' | 'done' | 'error'>('idle')
   const [fetchResult, setFetchResult] = useState<{
@@ -400,6 +489,8 @@ export default function TRScoutPage() {
               players={movements.entered_top30}
               emptyMsg="No new entrants to the top 30."
             />
+
+            <CommitmentsSection players={movements.newly_committed ?? []} />
 
             <Section
               title="Newly Uncommitted"

@@ -489,6 +489,10 @@ function extractPlayerData() {
       '1265': 2026,
       '1275': 2027,
       '1285': 2028,
+      '1259': 2025,
+      '1269': 2026,
+      '1279': 2027,
+      '1289': 2028,
     }
     const urlId = new URLSearchParams(window.location.search).get('id') || ''
     const grad_year = LIST_ID_TO_YEAR[urlId] || null
@@ -608,7 +612,9 @@ function extractPlayerData() {
       trigger.style.opacity = '0.7'
       trigger.textContent = 'Capturing...'
 
-      const API_BASE = 'http://localhost:3000'
+      const API_BASE = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://courtiq-three.vercel.app'
       try {
         const res = await fetch(`${API_BASE}/api/tr-scout/ingest`, {
           method: 'POST',
@@ -636,17 +642,183 @@ function extractPlayerData() {
     })
   }
 
+  const COMMITMENTS_LIST_IDS = new Set(['1259', '1269', '1279', '1289'])
+  const RANKINGS_LIST_IDS = new Set(['1255', '1265', '1275', '1285'])
+
+  function createCommitmentsCaptureButton() {
+    if (!window.location.href.includes('/list.asp')) return
+    if (document.getElementById('courtiq-commitments-btn')) return
+
+    const COMMITMENTS_ID_TO_YEAR = {
+      '1259': 2025,
+      '1269': 2026,
+      '1279': 2027,
+      '1289': 2028,
+    }
+    const urlId = new URLSearchParams(window.location.search).get('id') || ''
+    const grad_year = COMMITMENTS_ID_TO_YEAR[urlId] || null
+
+    const btn = document.createElement('div')
+    btn.id = 'courtiq-commitments-btn'
+    btn.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 160px;
+        right: 24px;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      ">
+        <div id="courtiq-commitments-status" style="display:none;background:rgba(0,0,0,0.8);color:white;padding:6px 12px;border-radius:8px;font-size:12px;"></div>
+        <button id="courtiq-commitments-trigger" style="
+          background: #16a34a;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(22,163,74,0.4);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        ">
+          ✦ Capture Commitments
+        </button>
+      </div>
+    `
+    document.body.appendChild(btn)
+
+    document.getElementById('courtiq-commitments-trigger').addEventListener('click', async () => {
+      const trigger = document.getElementById('courtiq-commitments-trigger')
+      const statusEl = document.getElementById('courtiq-commitments-status')
+
+      const CLASS_YEAR_ABBREVS = new Set(['SR', 'JR', 'FR', 'SO'])
+      const players = []
+
+      const links = document.querySelectorAll('a[href*="player.asp?id="]')
+      for (const link of links) {
+        const idMatch = link.getAttribute('href').match(/id=(\d+)/)
+        if (!idMatch) continue
+
+        const tennisrecruiting_id = idMatch[1]
+        const name = link.innerText.trim()
+        if (!name) continue
+
+        const row = link.closest('tr')
+        if (!row) continue
+
+        const cells = Array.from(row.querySelectorAll('td'))
+
+        let rating = null
+        let state = null
+        let committed_school = null
+
+        for (const cell of cells) {
+          const text = cell.innerText.trim()
+
+          if (!rating && /^\d-Star$/i.test(text)) {
+            rating = text
+          }
+          if (!rating) {
+            const img = cell.querySelector('img')
+            if (img && /^\d-Star$/i.test(img.alt || '')) rating = img.alt
+          }
+
+          if (!state && /^[A-Z]{2}$/.test(text) && !CLASS_YEAR_ABBREVS.has(text)) {
+            state = text
+          }
+        }
+
+        const knownValues = new Set([rating, state, name].filter(Boolean))
+        for (const cell of cells) {
+          const text = cell.innerText.trim()
+          if (
+            text.length >= 3 &&
+            /[a-zA-Z]/.test(text) &&
+            !knownValues.has(text) &&
+            !/^\d+$/.test(text) &&
+            !/^\d-Star$/i.test(text) &&
+            !/^[A-Z]{2}$/.test(text) &&
+            text !== name
+          ) {
+            committed_school = text
+            break
+          }
+        }
+
+        // Commitments require a school — skip rows without one
+        if (!committed_school) continue
+
+        players.push({ tennisrecruiting_id, name, committed_school, state, rating, grad_year })
+      }
+
+      if (players.length === 0) {
+        showToast('No commitments found on this page', true)
+        return
+      }
+
+      statusEl.style.display = 'block'
+      statusEl.textContent = `Capturing ${players.length} commitments...`
+      trigger.style.opacity = '0.7'
+      trigger.textContent = 'Capturing...'
+
+      const API_BASE = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://courtiq-three.vercel.app'
+      try {
+        const res = await fetch(`${API_BASE}/api/tr-scout/ingest-commitments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            players,
+            snapshot_date: new Date().toISOString().split('T')[0],
+            grad_year,
+          }),
+        })
+
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed')
+
+        statusEl.textContent = `✓ ${json.saved ?? players.length} commitments captured`
+        showToast(`✓ ${json.saved ?? players.length} commitments captured`, false)
+      } catch (err) {
+        statusEl.textContent = `✗ Error: ${err.message || 'Unknown error'}`
+        showToast('Capture failed: ' + (err.message || 'Unknown error'), true)
+      } finally {
+        trigger.textContent = '✦ Capture Commitments'
+        trigger.style.opacity = '1'
+        setTimeout(() => { statusEl.style.display = 'none' }, 4000)
+      }
+    })
+  }
+
+  function initListButtons() {
+    if (!window.location.href.includes('/list.asp')) return
+    const urlId = new URLSearchParams(window.location.search).get('id') || ''
+    if (COMMITMENTS_LIST_IDS.has(urlId)) {
+      createCommitmentsCaptureButton()
+    } else if (RANKINGS_LIST_IDS.has(urlId)) {
+      createRankingsCaptureButton()
+    }
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       createButton()
       createSyncButton()
       createITFSyncButton()
-      if (window.location.href.includes('/list.asp')) createRankingsCaptureButton()
+      initListButtons()
     })
   } else {
     createButton()
     createSyncButton()
     createITFSyncButton()
-    if (window.location.href.includes('/list.asp')) createRankingsCaptureButton()
+    initListButtons()
   }
 }

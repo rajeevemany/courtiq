@@ -24,15 +24,63 @@ export interface TRMover extends TRSnapshot {
   previous_school?: string | null
 }
 
+export interface TRCommitment {
+  id: string
+  tennisrecruiting_id: string
+  name: string
+  committed_school: string
+  grad_year: number | null
+  rating: string | null
+  state: string | null
+  first_seen_date: string
+  in_pipeline: boolean
+  recruit_id: string | null
+}
+
 export interface MovementsResponse {
   rising: TRMover[]
   entered_top30: TRMover[]
   newly_uncommitted: TRMover[]
   top30_uncommitted: TRSnapshot[]
+  newly_committed: TRCommitment[]
   snapshot_dates: { current: string | null; previous: string | null }
 }
 
+async function getNewlyCommitted(recruits: { id: string; name: string }[]): Promise<TRCommitment[]> {
+  // Find the most recent first_seen_date in tr_commitment_snapshots
+  const { data: latestDateRows } = await supabase
+    .from('tr_commitment_snapshots')
+    .select('first_seen_date')
+    .order('first_seen_date', { ascending: false })
+    .limit(1)
+
+  const latestDate = latestDateRows?.[0]?.first_seen_date ?? null
+  if (!latestDate) return []
+
+  const { data: rows } = await supabase
+    .from('tr_commitment_snapshots')
+    .select('*')
+    .eq('first_seen_date', latestDate)
+    .order('name', { ascending: true })
+
+  return (rows ?? []).map(player => {
+    const match = recruits.find(r =>
+      r.name.toLowerCase().includes(player.name.toLowerCase()) ||
+      player.name.toLowerCase().includes(r.name.toLowerCase())
+    )
+    return {
+      ...player,
+      in_pipeline: !!match,
+      recruit_id: match?.id ?? null,
+    }
+  })
+}
+
 export async function GET() {
+  // Fetch recruits once for pipeline cross-reference
+  const { data: recruits } = await supabase.from('recruits').select('id, name')
+  const recruitList = recruits ?? []
+
   // Get the two most recent snapshot dates
   const { data: dateRows, error: dateErr } = await supabase
     .from('tr_ranking_snapshots')
@@ -57,6 +105,7 @@ export async function GET() {
       entered_top30: [],
       newly_uncommitted: [],
       top30_uncommitted: [],
+      newly_committed: await getNewlyCommitted(recruitList),
       snapshot_dates: { current: null, previous: null },
     } satisfies MovementsResponse)
   }
@@ -80,6 +129,7 @@ export async function GET() {
       entered_top30: [],
       newly_uncommitted: [],
       top30_uncommitted,
+      newly_committed: await getNewlyCommitted(recruitList),
       snapshot_dates: { current: currentDate, previous: null },
     } satisfies MovementsResponse)
   }
@@ -127,6 +177,7 @@ export async function GET() {
     entered_top30,
     newly_uncommitted,
     top30_uncommitted,
+    newly_committed: await getNewlyCommitted(recruitList),
     snapshot_dates: { current: currentDate, previous: previousDate },
   } satisfies MovementsResponse)
 }
