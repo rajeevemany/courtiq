@@ -77,11 +77,7 @@ INTERACTION HISTORY:
 ${interactionSummary}`
 
     // Build content blocks — PDF documents first, then the text prompt
-    type ContentBlock =
-      | { type: 'document'; source: { type: 'base64'; media_type: string; data: string } }
-      | { type: 'text'; text: string }
-
-    const contentBlocks: ContentBlock[] = []
+    const contentBlocks: Anthropic.MessageParam['content'] = []
 
     for (const doc of documents ?? []) {
       if (doc.type !== 'application/pdf') continue
@@ -101,7 +97,7 @@ ${interactionSummary}`
 
         contentBlocks.push({
           type: 'document',
-          source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+          source: { type: 'base64' as const, media_type: 'application/pdf' as const, data: base64 },
         })
       } catch {
         // Skip documents that fail to fetch
