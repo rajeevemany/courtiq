@@ -8,6 +8,7 @@ import EditRecruitForm from '@/app/components/EditRecruitForm'
 import FitScoreCalculator from '@/app/components/FitScoreCalculator'
 import MatchResultsSection from '@/app/components/MatchResultsSection'
 import ScoutReportSection from '@/app/components/ScoutReportSection'
+import ComparablePlayersCard from '@/app/components/ComparablePlayersCard'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -242,6 +243,9 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
                 <p className="text-sm text-slate-500">No competing schools logged</p>
               )}
             </div>
+
+            {/* COMPARABLE COLUMBIA OUTCOMES */}
+            <ComparablePlayersCard recruitRanking={recruit.national_ranking} />
 
             {/* AI BRIEF */}
             <AIBriefButton
