@@ -13,6 +13,7 @@ interface CommitmentPlayer {
   grad_year?: number | null
   rating?: string | null
   state?: string | null
+  conference?: string | null
 }
 
 export async function POST(req: NextRequest) {
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
       grad_year: p.grad_year ?? grad_year ?? null,
       rating: p.rating ?? null,
       state: p.state ?? null,
+      conference: p.conference ?? null,
       first_seen_date: snapshot_date,
     }))
 

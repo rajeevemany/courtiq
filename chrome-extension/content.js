@@ -698,11 +698,10 @@ function extractPlayerData() {
       const trigger = document.getElementById('courtiq-commitments-trigger')
       const statusEl = document.getElementById('courtiq-commitments-status')
 
-      const CLASS_YEAR_ABBREVS = new Set(['SR', 'JR', 'FR', 'SO'])
       const players = []
 
-      const links = document.querySelectorAll('a[href*="player.asp?id="]')
-      for (const link of links) {
+      const allLinks = document.querySelectorAll('a[href*="player.asp?id="]')
+      for (const link of allLinks) {
         const idMatch = link.getAttribute('href').match(/id=(\d+)/)
         if (!idMatch) continue
 
@@ -715,47 +714,21 @@ function extractPlayerData() {
 
         const cells = Array.from(row.querySelectorAll('td'))
 
-        let rating = null
-        let state = null
-        let committed_school = null
+        // 2-cell rows are news feed entries — skip
+        if (cells.length === 2) continue
 
-        for (const cell of cells) {
-          const text = cell.innerText.trim()
+        // Main table rows: 4 cells, first cell is empty (rank icon/blank)
+        if (cells.length !== 4 || cells[0].innerText.trim() !== '') continue
 
-          if (!rating && /^\d-Star$/i.test(text)) {
-            rating = text
-          }
-          if (!rating) {
-            const img = cell.querySelector('img')
-            if (img && /^\d-Star$/i.test(img.alt || '')) rating = img.alt
-          }
-
-          if (!state && /^[A-Z]{2}$/.test(text) && !CLASS_YEAR_ABBREVS.has(text)) {
-            state = text
-          }
-        }
-
-        const knownValues = new Set([rating, state, name].filter(Boolean))
-        for (const cell of cells) {
-          const text = cell.innerText.trim()
-          if (
-            text.length >= 3 &&
-            /[a-zA-Z]/.test(text) &&
-            !knownValues.has(text) &&
-            !/^\d+$/.test(text) &&
-            !/^\d-Star$/i.test(text) &&
-            !/^[A-Z]{2}$/.test(text) &&
-            text !== name
-          ) {
-            committed_school = text
-            break
-          }
-        }
-
-        // Commitments require a school — skip rows without one
+        const committed_school = cells[3].innerText.trim()
         if (!committed_school) continue
 
-        players.push({ tennisrecruiting_id, name, committed_school, state, rating, grad_year })
+        const conference = cells[2].innerText.trim() || null
+
+        const stateMatch = cells[1].innerText.match(/\(([A-Z]{2})\)/)
+        const state = stateMatch ? stateMatch[1] : null
+
+        players.push({ tennisrecruiting_id, name, committed_school, conference, state, grad_year })
       }
 
       if (players.length === 0) {
