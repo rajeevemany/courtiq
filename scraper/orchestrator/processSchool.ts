@@ -13,9 +13,9 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
-import { chromium } from 'playwright';
-import { lookupSchool } from '../schoolUrls';
-import { scrapeRosterWithPlaywright, scrapeBioWithPlaywright } from '../playwrightScraper';
+import { chromium, type Browser } from 'playwright';
+import { lookupSchool, SCHOOL_MAP } from '../schoolUrls';
+import { scrapeRosterWithPlaywright, scrapeBioWithPlaywright, ManagedBrowser } from '../playwrightScraper';
 import { matchName, summarizeMatches } from '../matchName';
 import type { CareerStats } from '../extractCareerStats';
 
@@ -76,9 +76,11 @@ export interface SchoolResult {
 }
 
 export interface ProcessOptions {
-  delay_ms?: number;    // ms to wait between bio page fetches (default 300)
-  dry_run?: boolean;    // if true, skip Supabase upserts
-  max_players?: number; // cap processed players (for testing)
+  delay_ms?: number;         // ms to wait between bio page fetches (default 300)
+  dry_run?: boolean;         // if true, skip Supabase upserts
+  max_players?: number;      // cap processed players (for testing)
+  historical_mode?: boolean; // scrape archived season rosters instead of current
+  startFrom?: string;        // skip all SCHOOL_MAP entries before this school name
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,6 +89,19 @@ export interface ProcessOptions {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function buildSeasonString(year: number): string {
+  const shortNext = String(year + 1).slice(2);
+  return `${year}-${shortNext}`; // e.g. 2021 → "2021-22"
+}
+
+function parseWL(wl: string | null | undefined): [number | null, number | null] {
+  if (!wl) return [null, null];
+  const parts = wl.split('-').map(Number);
+  return (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]))
+    ? [parts[0], parts[1]]
+    : [null, null];
 }
 
 async function upsertCollegeCareer(
@@ -126,6 +141,187 @@ async function upsertCollegeCareer(
 // MAIN EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function processSchoolHistorical(
+  supabase: SupabaseClient,
+  schoolName: string,
+  juniors: JuniorProfileRow[],
+  entry: ReturnType<typeof lookupSchool>,
+  options: ProcessOptions,
+  startTime: number,
+  externalBrowser?: Browser,
+): Promise<SchoolResult> {
+  const { delay_ms = 300, dry_run = false, max_players } = options;
+  const playerResults: PlayerResult[] = [];
+  let upserted = 0, matchedExact = 0, matchedHigh = 0, ambiguous = 0, noMatch = 0, errors = 0;
+
+  // Skip juniors already in college_careers for this school
+  const { data: existingCareers } = await supabase
+    .from('college_careers')
+    .select('junior_profile_id')
+    .eq('school', schoolName);
+
+  const alreadyScraped = new Set((existingCareers ?? []).map(c => c.junior_profile_id));
+  const toProcess = juniors.filter(j => !alreadyScraped.has(j.id));
+  const limited = max_players ? toProcess.slice(0, max_players) : toProcess;
+
+  const ownBrowser = !externalBrowser;
+  const browser = externalBrowser ?? await chromium.launch({ headless: true });
+
+  try {
+    for (const junior of limited) {
+      if (!junior.committed_year) {
+        playerResults.push({
+          junior_id: junior.id, tr_name: junior.name,
+          confidence: 'no_match', roster_player: null, upserted: false,
+          error: 'No committed_year',
+        });
+        noMatch++;
+        continue;
+      }
+
+      const startYear = junior.committed_year;
+      const endYear = Math.min(startYear + 4, 2025);
+      const seasons: string[] = [];
+      for (let y = startYear; y <= endYear; y++) {
+        seasons.push(buildSeasonString(y));
+      }
+
+      let matched = false;
+
+      for (const season of seasons) {
+        await sleep(2000); // 2s between season fetches
+
+        let rosterResult;
+        try {
+          rosterResult = await scrapeRosterWithPlaywright(
+            entry!.roster_base,
+            browser,
+            `/roster/${season}`,
+          );
+        } catch {
+          continue;
+        }
+
+        if (!rosterResult.players || rosterResult.players.length === 0) continue;
+
+        console.log(`[historical] school=${schoolName} season=${season} roster=${rosterResult.players.length}`);
+
+        const matchResult = matchName(junior.name, rosterResult.players);
+
+        if (matchResult.confidence === 'exact') matchedExact++;
+        else if (matchResult.confidence === 'high') matchedHigh++;
+        else if (matchResult.confidence === 'ambiguous') { ambiguous++; continue; }
+        else continue; // no_match — try next season
+
+        const rosterPlayer = matchResult.match!;
+        let stats: CareerStats | null = null;
+
+        try {
+          await sleep(delay_ms);
+          stats = await scrapeBioWithPlaywright(rosterPlayer.profile_url, browser);
+        } catch (err) {
+          playerResults.push({
+            junior_id: junior.id, tr_name: junior.name,
+            confidence: matchResult.confidence, roster_player: rosterPlayer.full_name,
+            upserted: false, error: err instanceof Error ? err.message : String(err),
+          });
+          errors++;
+          matched = true;
+          break;
+        }
+
+        if (!dry_run && stats) {
+          try {
+            const [csw, csl]   = parseWL(stats.career_singles_overall);
+            const [csdw, csdl] = parseWL(stats.career_singles_dual);
+            const [cdw, cdl]   = parseWL(stats.career_doubles_overall);
+
+            await upsertCollegeCareer(supabase, {
+              junior_profile_id:          junior.id,
+              school:                     schoolName,
+              start_year:                 stats.seasons?.[0]?.season
+                                            ? parseInt(stats.seasons[0].season.split('-')[0], 10) || null
+                                            : null,
+              years_played:               stats.seasons?.length || null,
+              career_singles_wins:        csw,
+              career_singles_losses:      csl,
+              career_singles_dual_wins:   csdw,
+              career_singles_dual_losses: csdl,
+              career_doubles_wins:        cdw,
+              career_doubles_losses:      cdl,
+              peak_ita_ranking:           stats.ita_rank_peak_career ?? null,
+              last_scraped_at:            new Date().toISOString(),
+              yearly_stats:               stats.seasons?.length
+                ? stats.seasons.reduce((acc, s) => {
+                    const [sow, sol] = parseWL(s.singles_overall);
+                    const [sdw, sdl] = parseWL(s.singles_dual);
+                    const [dow, dol] = parseWL(s.doubles_overall);
+                    acc[s.season] = {
+                      singles_overall: sow !== null ? { w: sow, l: sol } : null,
+                      singles_dual:    sdw !== null ? { w: sdw, l: sdl } : null,
+                      doubles_overall: dow !== null ? { w: dow, l: dol } : null,
+                      ita_rank_peak:   s.ita_rank_peak ?? null,
+                    };
+                    return acc;
+                  }, {} as Record<string, object>)
+                : null,
+              source_url:                 rosterPlayer.profile_url,
+              platform:                   entry!.platform,
+              honors:                     stats.honors ?? null,
+              career_summary:             stats.career_summary ?? null,
+            });
+            upserted++;
+            console.log(`[historical] matched=${schoolName} junior="${junior.name}" season=${season} → "${rosterPlayer.full_name}"`);
+          } catch (err) {
+            playerResults.push({
+              junior_id: junior.id, tr_name: junior.name,
+              confidence: matchResult.confidence, roster_player: rosterPlayer.full_name,
+              upserted: false, error: err instanceof Error ? err.message : String(err),
+            });
+            errors++;
+            matched = true;
+            break;
+          }
+        } else if (dry_run) {
+          upserted++;
+        }
+
+        playerResults.push({
+          junior_id: junior.id, tr_name: junior.name,
+          confidence: matchResult.confidence, roster_player: rosterPlayer.full_name,
+          upserted: !dry_run, error: null,
+        });
+        matched = true;
+        break;
+      }
+
+      if (!matched) {
+        noMatch++;
+        playerResults.push({
+          junior_id: junior.id, tr_name: junior.name,
+          confidence: 'no_match', roster_player: null, upserted: false, error: null,
+        });
+      }
+    }
+  } finally {
+    if (ownBrowser) await browser.close();
+  }
+
+  return {
+    school:        schoolName,
+    roster_size:   0, // N/A in historical mode
+    total_juniors: limited.length,
+    upserted,
+    matched_exact: matchedExact,
+    matched_high:  matchedHigh,
+    ambiguous,
+    no_match:      noMatch,
+    errors,
+    players:       playerResults,
+    elapsed_ms:    Date.now() - startTime,
+  };
+}
+
 /**
  * Process one school: scrape roster, match juniors, fetch stats, upsert.
  *
@@ -141,7 +337,7 @@ export async function processSchool(
   options: ProcessOptions = {},
 ): Promise<SchoolResult> {
   const startTime = Date.now();
-  const { delay_ms = 300, dry_run = false, max_players } = options;
+  const { delay_ms = 300, dry_run = false, max_players, historical_mode = false } = options;
   const playerResults: PlayerResult[] = [];
 
   // 1. Look up school URL
@@ -167,6 +363,11 @@ export async function processSchool(
       })),
       elapsed_ms: Date.now() - startTime,
     };
+  }
+
+  // Historical mode — branch to archived season scraper
+  if (historical_mode) {
+    return processSchoolHistorical(supabase, schoolName, juniors, entry, options, startTime);
   }
 
   const platform = entry.platform;
@@ -249,14 +450,6 @@ export async function processSchool(
       // 5. Upsert to college_careers
       if (!dry_run) {
         try {
-          const parseWL = (wl: string | null | undefined): [number | null, number | null] => {
-            if (!wl) return [null, null];
-            const parts = wl.split('-').map(Number);
-            return (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]))
-              ? [parts[0], parts[1]]
-              : [null, null];
-          };
-
           const [csw, csl]   = parseWL(stats?.career_singles_overall);
           const [csdw, csdl] = parseWL(stats?.career_singles_dual);
           const [cdw, cdl]   = parseWL(stats?.career_doubles_overall);
@@ -325,4 +518,70 @@ export async function processSchool(
   } finally {
     await browser.close();
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BATCH HISTORICAL  — process every school in SCHOOL_MAP sequentially,
+//                     restarting the browser every 10 schools.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Process all schools in SCHOOL_MAP in historical mode.
+ *
+ * @param supabase  Supabase client (service role)
+ * @param options   Processing options. `startFrom` skips all schools before
+ *                  the named entry so a run can be resumed after a crash.
+ */
+export async function processAllHistorical(
+  supabase: SupabaseClient,
+  options: ProcessOptions = {},
+): Promise<SchoolResult[]> {
+  const { startFrom } = options;
+  const schoolNames = Object.keys(SCHOOL_MAP);
+
+  let startIdx = 0;
+  if (startFrom) {
+    const idx = schoolNames.indexOf(startFrom);
+    if (idx !== -1) {
+      startIdx = idx;
+    } else {
+      console.warn(`[processAllHistorical] startFrom school "${startFrom}" not found in SCHOOL_MAP — starting from the beginning`);
+    }
+  }
+
+  const schoolsToProcess = schoolNames.slice(startIdx);
+  const managedBrowser = new ManagedBrowser(10);
+  const results: SchoolResult[] = [];
+
+  try {
+    for (const schoolName of schoolsToProcess) {
+      const entry = lookupSchool(schoolName);
+      if (!entry) continue;
+
+      const { data: juniors } = await supabase
+        .from('junior_profiles')
+        .select('id, name, committed_school, committed_year, division, peak_ranking')
+        .eq('committed_school', schoolName);
+
+      if (!juniors || juniors.length === 0) continue;
+
+      const browser = await managedBrowser.get();
+      const startTime = Date.now();
+      const result = await processSchoolHistorical(
+        supabase,
+        schoolName,
+        juniors as JuniorProfileRow[],
+        entry,
+        options,
+        startTime,
+        browser,
+      );
+      results.push(result);
+      await managedBrowser.onSchoolDone();
+    }
+  } finally {
+    await managedBrowser.close();
+  }
+
+  return results;
 }

@@ -12,6 +12,62 @@ import type { CareerStats } from './extractCareerStats';
 export type { Browser };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MANAGED BROWSER  (restarts every N schools to prevent memory exhaustion)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Wraps a Playwright Browser instance and automatically closes + relaunches it
+ * after every `restartEvery` schools to prevent memory exhaustion during long
+ * historical scrape runs.
+ *
+ * Usage:
+ *   const mb = new ManagedBrowser();
+ *   const browser = await mb.get();          // launch (or reuse) browser
+ *   // ... scrape one school ...
+ *   await mb.onSchoolDone();                 // increment counter; restart if needed
+ *   await mb.close();                        // close when completely finished
+ */
+export class ManagedBrowser {
+  private _browser: Browser | null = null;
+  private _schoolsProcessed = 0;
+  private readonly _restartEvery: number;
+
+  constructor(restartEvery = 10) {
+    this._restartEvery = restartEvery;
+  }
+
+  async get(): Promise<Browser> {
+    if (!this._browser) {
+      this._browser = await chromium.launch({ headless: true });
+      console.log('[ManagedBrowser] Browser launched');
+    }
+    return this._browser;
+  }
+
+  /** Call once per school after it finishes. Restarts the browser if threshold reached. */
+  async onSchoolDone(): Promise<void> {
+    this._schoolsProcessed++;
+    if (this._schoolsProcessed % this._restartEvery === 0) {
+      console.log(`[ManagedBrowser] Restarting browser after ${this._schoolsProcessed} schools`);
+      await this._closeInternal();
+      this._browser = await chromium.launch({ headless: true });
+      console.log('[ManagedBrowser] Browser relaunched');
+    }
+  }
+
+  async close(): Promise<void> {
+    await this._closeInternal();
+  }
+
+  private async _closeInternal(): Promise<void> {
+    if (this._browser) {
+      await this._browser.close();
+      this._browser = null;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ROSTER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -24,14 +80,14 @@ export type { Browser };
  * @param browser   Optional existing Browser instance to reuse. If omitted, a new
  *                  browser is launched and closed when done.
  */
-export async function scrapeRosterWithPlaywright(sportUrl: string, browser?: Browser): Promise<ScrapeResult> {
-  const rosterUrl = sportUrl.replace(/\/$/, '') + '/roster';
+export async function scrapeRosterWithPlaywright(sportUrl: string, browser?: Browser, rosterSuffix = '/roster'): Promise<ScrapeResult> {
+  const rosterUrl = sportUrl.replace(/\/$/, '') + rosterSuffix;
   const ownBrowser = !browser;
   const b = browser ?? await chromium.launch({ headless: true });
 
   try {
     const page = await b.newPage();
-    await page.goto(rosterUrl, { waitUntil: 'domcontentloaded' });
+    await page.goto(rosterUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
@@ -68,7 +124,7 @@ export async function scrapeBioWithPlaywright(profileUrl: string, browser?: Brow
 
   try {
     const page = await b.newPage();
-    await page.goto(profileUrl, { waitUntil: 'domcontentloaded' });
+    await page.goto(profileUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 

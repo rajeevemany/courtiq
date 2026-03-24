@@ -9,6 +9,7 @@ import FitScoreCalculator from '@/app/components/FitScoreCalculator'
 import MatchResultsSection from '@/app/components/MatchResultsSection'
 import ScoutReportSection from '@/app/components/ScoutReportSection'
 import ComparablePlayersCard from '@/app/components/ComparablePlayersCard'
+import OutreachButton from '@/app/components/OutreachButton'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -189,6 +190,9 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-5">
+
+            {/* OUTREACH */}
+            <OutreachButton recruitId={recruit.id} recruitStage={recruit.status} />
 
             {/* FIT SCORE CALCULATOR */}
             <FitScoreCalculator
