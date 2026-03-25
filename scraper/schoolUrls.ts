@@ -15,11 +15,14 @@
 
 export type Platform = 'sidearm' | 'wmt';
 
+export type RosterUrlPattern = 'standard' | 'season' | 'season_trailing' | 'year_only' | 'compact';
+
 export interface SchoolEntry {
   canonical_name: string;
   roster_base: string;   // sport URL — scrapeRoster() will append /roster
   platform: Platform;
   conference: string;
+  rosterUrlPattern?: RosterUrlPattern; // defaults to 'standard' if omitted
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +99,7 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://virginiasports.com/sports/mten',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'season',
   },
   'NC State': {
     canonical_name: 'NC State',
@@ -114,6 +118,7 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://fightingirish.com/sports/mten',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'compact',
   },
   'Florida State': {
     canonical_name: 'Florida State',
@@ -126,12 +131,14 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://clemsontigers.com/sports/mens-tennis',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'year_only',
   },
   'Georgia Tech': {
     canonical_name: 'Georgia Tech',
     roster_base: 'https://ramblinwreck.com/sports/m-tennis',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'season_trailing',
   },
   'Louisville': {
     canonical_name: 'Louisville',
@@ -141,9 +148,10 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
   },
   'Miami (FL)': {
     canonical_name: 'Miami (FL)',
-    roster_base: 'https://miamihurricanes.com/sports/mens-tennis',
+    roster_base: 'https://miamihurricanes.com/sports/mten',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'season_trailing',
   },
   'Pittsburgh': {
     canonical_name: 'Pittsburgh',
@@ -168,6 +176,7 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://hokiesports.com/sports/mens-tennis',
     platform: 'sidearm',
     conference: 'ACC',
+    rosterUrlPattern: 'season',
   },
 
   // ── SEC ────────────────────────────────────────────────────────────────────
@@ -200,12 +209,14 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://ukathletics.com/sports/mten',
     platform: 'sidearm',
     conference: 'SEC',
+    rosterUrlPattern: 'season_trailing',
   },
   'LSU': {
     canonical_name: 'LSU',
-    roster_base: 'https://lsusports.net/sports/mens-tennis',
+    roster_base: 'https://lsusports.net/sports/mt',
     platform: 'sidearm',
     conference: 'SEC',
+    rosterUrlPattern: 'season_trailing',
   },
   'Ole Miss': {
     canonical_name: 'Ole Miss',
@@ -224,12 +235,14 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://vucommodores.com/sports/mten',
     platform: 'sidearm',
     conference: 'SEC',
+    rosterUrlPattern: 'season_trailing',
   },
   'South Carolina': {
     canonical_name: 'South Carolina',
     roster_base: 'https://gamecocksonline.com/sports/mten',
     platform: 'sidearm',
     conference: 'SEC',
+    rosterUrlPattern: 'season_trailing',
   },
   'Arkansas': {
     canonical_name: 'Arkansas',
@@ -242,6 +255,7 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
     roster_base: 'https://auburntigers.com/sports/mens-tennis',
     platform: 'sidearm',
     conference: 'SEC',
+    rosterUrlPattern: 'season',
   },
   'Texas A&M': {
     canonical_name: 'Texas A&M',
@@ -322,6 +336,18 @@ export const SCHOOL_MAP: Record<string, SchoolEntry> = {
   'Indiana': {
     canonical_name: 'Indiana',
     roster_base: 'https://iuhoosiers.com/sports/mens-tennis',
+    platform: 'sidearm',
+    conference: 'Big Ten',
+  },
+  'Michigan State': {
+    canonical_name: 'Michigan State',
+    roster_base: 'https://msuspartans.com/sports/mens-tennis',
+    platform: 'sidearm',
+    conference: 'Big Ten',
+  },
+  'Wisconsin': {
+    canonical_name: 'Wisconsin',
+    roster_base: 'https://uwbadgers.com/sports/mens-tennis',
     platform: 'sidearm',
     conference: 'Big Ten',
   },

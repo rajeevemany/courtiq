@@ -91,9 +91,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function buildSeasonString(year: number): string {
-  const shortNext = String(year + 1).slice(2);
-  return `${year}-${shortNext}`; // e.g. 2021 → "2021-22"
+function buildRosterUrl(rosterBase: string, pattern: string, year: number): string {
+  const season  = `${year}-${String(year + 1).slice(2)}`; // '2021-22'
+  const compact = `${String(year).slice(2)}${String(year + 1).slice(2)}`; // '2122'
+  switch (pattern) {
+    case 'season':          return `${rosterBase}/roster/season/${season}`;
+    case 'season_trailing': return `${rosterBase}/roster/season/${season}/`;
+    case 'year_only':       return `${rosterBase}/roster/season/${year}`;
+    case 'compact':         return `${rosterBase}/roster/season/${compact}`;
+    default:                return `${rosterBase}/roster/${season}`;
+  }
 }
 
 function parseWL(wl: string | null | undefined): [number | null, number | null] {
@@ -181,22 +188,25 @@ async function processSchoolHistorical(
 
       const startYear = junior.committed_year;
       const endYear = Math.min(startYear + 4, 2025);
-      const seasons: string[] = [];
+      const years: number[] = [];
       for (let y = startYear; y <= endYear; y++) {
-        seasons.push(buildSeasonString(y));
+        years.push(y);
       }
 
+      const pattern = entry!.rosterUrlPattern ?? 'standard';
       let matched = false;
 
-      for (const season of seasons) {
+      for (const year of years) {
+        const season = `${year}-${String(year + 1).slice(2)}`;
         await sleep(2000); // 2s between season fetches
 
         let rosterResult;
         try {
+          const rosterUrl = buildRosterUrl(entry!.roster_base, pattern, year);
           rosterResult = await scrapeRosterWithPlaywright(
-            entry!.roster_base,
+            rosterUrl,
             browser,
-            `/roster/${season}`,
+            '', // full URL already built — no suffix needed
           );
         } catch {
           continue;
