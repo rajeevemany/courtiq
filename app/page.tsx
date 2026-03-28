@@ -95,8 +95,11 @@ export default async function Home() {
           <Link href="/tr-scout" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             🎾 TR Scout
           </Link>
+          <Link href="/analytics/prospect-discovery" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
+            📊 Historical Analysis
+          </Link>
           <Link href="/admin/scrape" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
-            🗄 Junior DB
+            🗄 Admin
           </Link>
           <Link href="/admin/college-careers" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             🎓 College Careers
