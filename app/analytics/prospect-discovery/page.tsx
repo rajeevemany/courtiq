@@ -15,11 +15,25 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+interface BandPlayer {
+  name: string
+  school: string
+  peak_ranking: number | null
+  career_singles_wins: number
+  career_singles_losses: number
+  peak_ita_ranking: number | null
+  career_summary: string | null
+}
+
 interface RankingOutcome {
   band: string
-  count: number
-  avgWins: number
-  avgLosses: number
+  columbia_count: number
+  columbia_avg_wins: number
+  columbia_avg_losses: number
+  all_count: number
+  all_avg_wins: number
+  all_avg_losses: number
+  players: BandPlayer[]
 }
 
 interface Comparable {
@@ -98,6 +112,7 @@ export default function ProspectDiscoveryPage() {
   const [data, setData] = useState<DiscoveryData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedBand, setSelectedBand] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/analytics/prospect-discovery')
@@ -153,12 +168,12 @@ export default function ProspectDiscoveryPage() {
               <div className="mb-4">
                 <h2 className="text-lg font-semibold">Ranking-to-Outcome Model</h2>
                 <p className="text-slate-400 text-sm mt-1">
-                  Historical Columbia commits — avg career wins & losses by recruiting rank band
+                  Columbia vs all schools — avg career wins & losses by recruiting rank band. Click a bar to see players.
                 </p>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                {data.rankingOutcomes.every((r) => r.count === 0) ? (
+                {data.rankingOutcomes.every((r) => r.columbia_count === 0) ? (
                   <p className="text-slate-500 text-sm text-center py-8">
                     No historical Columbia commit data available yet.
                   </p>
@@ -167,7 +182,15 @@ export default function ProspectDiscoveryPage() {
                     <BarChart
                       data={data.rankingOutcomes}
                       margin={{ top: 8, right: 16, left: 0, bottom: 0 }}
-                      barCategoryGap="35%"
+                      barCategoryGap="30%"
+                      onClick={(e) => {
+                        if (e?.activeLabel) {
+                          setSelectedBand((prev) =>
+                            prev === e.activeLabel ? null : e.activeLabel ?? null
+                          )
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                       <XAxis
@@ -186,15 +209,29 @@ export default function ProspectDiscoveryPage() {
                         wrapperStyle={{ fontSize: 12, color: '#94a3b8', paddingTop: 12 }}
                       />
                       <Bar
-                        dataKey="avgWins"
-                        name="Avg Career Wins"
+                        dataKey="columbia_avg_wins"
+                        name="Columbia Avg Wins"
                         fill="#34d399"
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar
-                        dataKey="avgLosses"
-                        name="Avg Career Losses"
+                        dataKey="columbia_avg_losses"
+                        name="Columbia Avg Losses"
                         fill="#f87171"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="all_avg_wins"
+                        name="All Schools Avg Wins"
+                        fill="#60a5fa"
+                        fillOpacity={0.6}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="all_avg_losses"
+                        name="All Schools Avg Losses"
+                        fill="#fb923c"
+                        fillOpacity={0.6}
                         radius={[4, 4, 0, 0]}
                       />
                     </BarChart>
@@ -204,18 +241,96 @@ export default function ProspectDiscoveryPage() {
                 {/* Band stat pills */}
                 <div className="mt-5 grid grid-cols-5 gap-3">
                   {data.rankingOutcomes.map((r) => (
-                    <div
+                    <button
                       key={r.band}
-                      className="bg-white/5 rounded-xl px-3 py-2 text-center"
+                      onClick={() => setSelectedBand((prev) => prev === r.band ? null : r.band)}
+                      className={`rounded-xl px-3 py-2 text-center transition border ${
+                        selectedBand === r.band
+                          ? 'bg-blue-500/20 border-blue-400/40'
+                          : 'bg-white/5 border-transparent hover:bg-white/10'
+                      }`}
                     >
                       <p className="text-xs text-slate-400 mb-0.5">Rank {r.band}</p>
-                      <p className="text-white font-semibold text-sm">
-                        {r.avgWins}–{r.avgLosses}
+                      <p className="text-green-400 font-semibold text-sm">
+                        COL {r.columbia_avg_wins}–{r.columbia_avg_losses}
                       </p>
-                      <p className="text-slate-500 text-xs">{r.count} player{r.count !== 1 ? 's' : ''}</p>
-                    </div>
+                      <p className="text-blue-300/70 text-xs">
+                        All {r.all_avg_wins}–{r.all_avg_losses}
+                      </p>
+                      <p className="text-slate-500 text-xs mt-0.5">
+                        {r.columbia_count} COL · {r.all_count} total
+                      </p>
+                    </button>
                   ))}
                 </div>
+
+                {/* Player breakdown panel */}
+                {selectedBand && (() => {
+                  const band = data.rankingOutcomes.find((r) => r.band === selectedBand)
+                  if (!band) return null
+                  return (
+                    <div className="mt-5 border border-white/10 rounded-xl overflow-hidden">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-white/5">
+                        <p className="text-sm font-semibold text-white">
+                          Players in Rank {selectedBand} — Columbia
+                          <span className="ml-2 text-slate-400 font-normal">
+                            ({band.players.length} player{band.players.length !== 1 ? 's' : ''})
+                          </span>
+                        </p>
+                        <button
+                          onClick={() => setSelectedBand(null)}
+                          className="text-slate-400 hover:text-white text-lg leading-none transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {band.players.length === 0 ? (
+                        <p className="text-slate-500 text-sm text-center py-6">
+                          No Columbia players with career data in this band.
+                        </p>
+                      ) : (
+                        <div>
+                          {/* Table header */}
+                          <div className="grid grid-cols-[2fr_90px_110px_90px_3fr] gap-x-4 px-5 py-2 text-xs uppercase tracking-widest text-slate-500 font-medium border-b border-white/5">
+                            <span>Name</span>
+                            <span>Jr Rank</span>
+                            <span>Career</span>
+                            <span>Peak ITA</span>
+                            <span>Summary</span>
+                          </div>
+                          {band.players.map((p, i) => (
+                            <div
+                              key={i}
+                              className={`grid grid-cols-[2fr_90px_110px_90px_3fr] gap-x-4 px-5 py-3 items-center text-sm ${
+                                i !== band.players.length - 1 ? 'border-b border-white/5' : ''
+                              } hover:bg-white/5 transition`}
+                            >
+                              <span className="font-medium text-white">{p.name}</span>
+                              <span className="text-slate-300">
+                                {p.peak_ranking != null ? `#${p.peak_ranking}` : '—'}
+                              </span>
+                              <span className="text-slate-300">
+                                <span className="text-green-400">{p.career_singles_wins}</span>
+                                <span className="text-slate-500">–</span>
+                                <span className="text-red-400">{p.career_singles_losses}</span>
+                              </span>
+                              <span className="text-slate-400">
+                                {p.peak_ita_ranking != null ? `#${p.peak_ita_ranking}` : '—'}
+                              </span>
+                              <span className="text-slate-400 text-xs truncate">
+                                {p.career_summary
+                                  ? p.career_summary.length > 80
+                                    ? p.career_summary.slice(0, 80) + '…'
+                                    : p.career_summary
+                                  : '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             </section>
 

@@ -42,38 +42,99 @@ export async function GET() {
 
     const juniorIds = (columbiaJuniors || []).map((j) => j.id)
 
-    const { data: columbiaCareers, error: err2 } = await supabase
+    const { data: columbiaCareers, error: err2a } = await supabase
       .from('college_careers')
       .select('junior_profile_id, career_singles_wins, career_singles_losses, peak_ita_ranking')
       .in('junior_profile_id', juniorIds.length ? juniorIds : ['00000000-0000-0000-0000-000000000000'])
 
-    if (err2) throw err2
+    if (err2a) throw err2a
 
     const careerMap = new Map(
       (columbiaCareers || []).map((c) => [c.junior_profile_id, c])
     )
 
     type BandData = { wins: number[]; losses: number[] }
-    const bandMap: Record<string, BandData> = Object.fromEntries(
+    const colBandMap: Record<string, BandData> = Object.fromEntries(
       BAND_ORDER.map((b) => [b, { wins: [], losses: [] }])
+    )
+
+    type BandPlayer = {
+      name: string; school: string; peak_ranking: number | null
+      career_singles_wins: number; career_singles_losses: number
+      peak_ita_ranking: number | null; career_summary: string | null
+    }
+    const colBandPlayers: Record<string, BandPlayer[]> = Object.fromEntries(
+      BAND_ORDER.map((b) => [b, []])
     )
 
     for (const junior of columbiaJuniors || []) {
       const career = careerMap.get(junior.id)
+      if (!career || career.career_singles_wins == null) continue
+      const band = getRankingBand(junior.peak_ranking)
+      colBandMap[band].wins.push(career.career_singles_wins)
+      colBandMap[band].losses.push(career.career_singles_losses ?? 0)
+      colBandPlayers[band].push({
+        name: junior.name,
+        school: 'Columbia',
+        peak_ranking: junior.peak_ranking,
+        career_singles_wins: career.career_singles_wins,
+        career_singles_losses: career.career_singles_losses ?? 0,
+        peak_ita_ranking: career.peak_ita_ranking ?? null,
+        career_summary: null,
+      })
+    }
+
+    // All-schools bucketing
+    const { data: allJuniors, error: err2b } = await supabase
+      .from('junior_profiles')
+      .select('id, peak_ranking')
+      .not('peak_ranking', 'is', null)
+
+    if (err2b) throw err2b
+
+    const allJuniorIds = (allJuniors || []).map((j) => j.id)
+
+    const { data: allCareers, error: err2c } = await supabase
+      .from('college_careers')
+      .select('junior_profile_id, career_singles_wins, career_singles_losses')
+      .in('junior_profile_id', allJuniorIds.length ? allJuniorIds : ['00000000-0000-0000-0000-000000000000'])
+      .not('career_singles_wins', 'is', null)
+
+    if (err2c) throw err2c
+
+    const allCareerMap = new Map(
+      (allCareers || []).map((c) => [c.junior_profile_id, c])
+    )
+
+    const allBandMap: Record<string, BandData> = Object.fromEntries(
+      BAND_ORDER.map((b) => [b, { wins: [], losses: [] }])
+    )
+
+    for (const junior of allJuniors || []) {
+      const career = allCareerMap.get(junior.id)
       if (!career) continue
       const band = getRankingBand(junior.peak_ranking)
-      bandMap[band].wins.push(career.career_singles_wins ?? 0)
-      bandMap[band].losses.push(career.career_singles_losses ?? 0)
+      allBandMap[band].wins.push(career.career_singles_wins)
+      allBandMap[band].losses.push(career.career_singles_losses ?? 0)
     }
 
     const rankingOutcomes = BAND_ORDER.map((band) => {
-      const { wins, losses } = bandMap[band]
-      const count = wins.length
+      const col = colBandMap[band]
+      const all = allBandMap[band]
+      const colCount = col.wins.length
+      const allCount = all.wins.length
+      const players = [...colBandPlayers[band]].sort(
+        (a, b) => b.career_singles_wins - a.career_singles_wins
+      )
       return {
         band,
-        count,
-        avgWins: count ? Math.round(wins.reduce((a, b) => a + b, 0) / count) : 0,
-        avgLosses: count ? Math.round(losses.reduce((a, b) => a + b, 0) / count) : 0,
+        columbia_count: colCount,
+        columbia_avg_wins: colCount ? Math.round(col.wins.reduce((a, b) => a + b, 0) / colCount) : 0,
+        columbia_avg_losses: colCount ? Math.round(col.losses.reduce((a, b) => a + b, 0) / colCount) : 0,
+        all_count: allCount,
+        all_avg_wins: allCount ? Math.round(all.wins.reduce((a, b) => a + b, 0) / allCount) : 0,
+        all_avg_losses: allCount ? Math.round(all.losses.reduce((a, b) => a + b, 0) / allCount) : 0,
+        players,
       }
     })
 
