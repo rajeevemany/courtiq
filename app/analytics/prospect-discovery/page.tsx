@@ -185,9 +185,10 @@ export default function ProspectDiscoveryPage() {
                       barCategoryGap="30%"
                       onClick={(e) => {
                         if (e?.activeLabel) {
-                          setSelectedBand((prev) =>
-                            prev === e.activeLabel ? null : e.activeLabel ?? null
-                          )
+                          setSelectedBand((prev) => {
+                            const label = e.activeLabel != null ? String(e.activeLabel) : null
+                            return prev === label ? null : label
+                          })
                         }
                       }}
                       style={{ cursor: 'pointer' }}
