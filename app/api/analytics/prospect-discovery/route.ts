@@ -84,37 +84,34 @@ export async function GET() {
       })
     }
 
-    // All-schools bucketing
-    const { data: allJuniors, error: err2b } = await supabase
-      .from('junior_profiles')
-      .select('id, peak_ranking')
-      .not('peak_ranking', 'is', null)
+    // All-schools bucketing — fetch careers first, then join rankings
+    const { data: allCareers, error: err2b } = await supabase
+      .from('college_careers')
+      .select('junior_profile_id, career_singles_wins, career_singles_losses')
+      .not('career_singles_wins', 'is', null)
 
     if (err2b) throw err2b
 
-    const allJuniorIds = (allJuniors || []).map((j) => j.id)
+    const careerJuniorIds = (allCareers || []).map((c) => c.junior_profile_id)
 
-    const { data: allCareers, error: err2c } = await supabase
-      .from('college_careers')
-      .select('junior_profile_id, career_singles_wins, career_singles_losses')
-      .in('junior_profile_id', allJuniorIds.length ? allJuniorIds : ['00000000-0000-0000-0000-000000000000'])
-      .not('career_singles_wins', 'is', null)
+    const { data: careerJuniors, error: err2c } = await supabase
+      .from('junior_profiles')
+      .select('id, peak_ranking')
+      .in('id', careerJuniorIds.length ? careerJuniorIds : ['00000000-0000-0000-0000-000000000000'])
 
     if (err2c) throw err2c
 
-    const allCareerMap = new Map(
-      (allCareers || []).map((c) => [c.junior_profile_id, c])
-    )
+    const juniorRankMap = new Map((careerJuniors || []).map((j) => [j.id, j.peak_ranking]))
 
     const allBandMap: Record<string, BandData> = Object.fromEntries(
       BAND_ORDER.map((b) => [b, { wins: [], losses: [] }])
     )
 
-    for (const junior of allJuniors || []) {
-      const career = allCareerMap.get(junior.id)
-      if (!career) continue
-      const band = getRankingBand(junior.peak_ranking)
-      allBandMap[band].wins.push(career.career_singles_wins)
+    for (const career of allCareers || []) {
+      const peak_ranking = juniorRankMap.get(career.junior_profile_id)
+      if (peak_ranking == null) continue
+      const band = getRankingBand(peak_ranking)
+      allBandMap[band].wins.push(career.career_singles_wins!)
       allBandMap[band].losses.push(career.career_singles_losses ?? 0)
     }
 
