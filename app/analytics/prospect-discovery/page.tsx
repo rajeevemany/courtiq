@@ -273,7 +273,7 @@ export default function ProspectDiscoveryPage() {
                     <div className="mt-5 border border-white/10 rounded-xl overflow-hidden">
                       <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 bg-white/5">
                         <p className="text-sm font-semibold text-white">
-                          Players in Rank {selectedBand} — Columbia
+                          Players in Rank {selectedBand} — All Schools
                           <span className="ml-2 text-slate-400 font-normal">
                             ({band.players.length} player{band.players.length !== 1 ? 's' : ''})
                           </span>
@@ -287,13 +287,14 @@ export default function ProspectDiscoveryPage() {
                       </div>
                       {band.players.length === 0 ? (
                         <p className="text-slate-500 text-sm text-center py-6">
-                          No Columbia players with career data in this band.
+                          No players with career data in this band.
                         </p>
                       ) : (
                         <div>
                           {/* Table header */}
-                          <div className="grid grid-cols-[2fr_90px_110px_90px_3fr] gap-x-4 px-5 py-2 text-xs uppercase tracking-widest text-slate-500 font-medium border-b border-white/5">
+                          <div className="grid grid-cols-[2fr_1.5fr_80px_110px_80px_3fr] gap-x-4 px-5 py-2 text-xs uppercase tracking-widest text-slate-500 font-medium border-b border-white/5">
                             <span>Name</span>
+                            <span>School</span>
                             <span>Jr Rank</span>
                             <span>Career</span>
                             <span>Peak ITA</span>
@@ -302,11 +303,12 @@ export default function ProspectDiscoveryPage() {
                           {band.players.map((p, i) => (
                             <div
                               key={i}
-                              className={`grid grid-cols-[2fr_90px_110px_90px_3fr] gap-x-4 px-5 py-3 items-center text-sm ${
+                              className={`grid grid-cols-[2fr_1.5fr_80px_110px_80px_3fr] gap-x-4 px-5 py-3 items-center text-sm ${
                                 i !== band.players.length - 1 ? 'border-b border-white/5' : ''
                               } hover:bg-white/5 transition`}
                             >
                               <span className="font-medium text-white">{p.name}</span>
+                              <span className="text-slate-300 truncate">{p.school ?? '—'}</span>
                               <span className="text-slate-300">
                                 {p.peak_ranking != null ? `#${p.peak_ranking}` : '—'}
                               </span>

@@ -63,9 +63,6 @@ export async function GET() {
       career_singles_wins: number; career_singles_losses: number
       peak_ita_ranking: number | null; career_summary: string | null
     }
-    const colBandPlayers: Record<string, BandPlayer[]> = Object.fromEntries(
-      BAND_ORDER.map((b) => [b, []])
-    )
 
     for (const junior of columbiaJuniors || []) {
       const career = careerMap.get(junior.id)
@@ -73,21 +70,12 @@ export async function GET() {
       const band = getRankingBand(junior.peak_ranking)
       colBandMap[band].wins.push(career.career_singles_wins)
       colBandMap[band].losses.push(career.career_singles_losses ?? 0)
-      colBandPlayers[band].push({
-        name: junior.name,
-        school: 'Columbia',
-        peak_ranking: junior.peak_ranking,
-        career_singles_wins: career.career_singles_wins,
-        career_singles_losses: career.career_singles_losses ?? 0,
-        peak_ita_ranking: career.peak_ita_ranking ?? null,
-        career_summary: null,
-      })
     }
 
     // All-schools bucketing — fetch careers first, then join rankings
     const { data: allCareers, error: err2b } = await supabase
       .from('college_careers')
-      .select('junior_profile_id, career_singles_wins, career_singles_losses')
+      .select('junior_profile_id, career_singles_wins, career_singles_losses, school, career_summary, peak_ita_ranking')
       .not('career_singles_wins', 'is', null)
 
     if (err2b) throw err2b
@@ -96,15 +84,19 @@ export async function GET() {
 
     const { data: careerJuniors, error: err2c } = await supabase
       .from('junior_profiles')
-      .select('id, peak_ranking')
+      .select('id, peak_ranking, name')
       .in('id', careerJuniorIds.length ? careerJuniorIds : ['00000000-0000-0000-0000-000000000000'])
 
     if (err2c) throw err2c
 
     const juniorRankMap = new Map((careerJuniors || []).map((j) => [j.id, j.peak_ranking]))
+    const juniorNameMap = new Map((careerJuniors || []).map((j) => [j.id, j.name]))
 
     const allBandMap: Record<string, BandData> = Object.fromEntries(
       BAND_ORDER.map((b) => [b, { wins: [], losses: [] }])
+    )
+    const allBandPlayers: Record<string, BandPlayer[]> = Object.fromEntries(
+      BAND_ORDER.map((b) => [b, []])
     )
 
     for (const career of allCareers || []) {
@@ -113,6 +105,15 @@ export async function GET() {
       const band = getRankingBand(peak_ranking)
       allBandMap[band].wins.push(career.career_singles_wins!)
       allBandMap[band].losses.push(career.career_singles_losses ?? 0)
+      allBandPlayers[band].push({
+        name: juniorNameMap.get(career.junior_profile_id) ?? 'Unknown',
+        school: career.school,
+        peak_ranking,
+        career_singles_wins: career.career_singles_wins!,
+        career_singles_losses: career.career_singles_losses ?? 0,
+        peak_ita_ranking: career.peak_ita_ranking ?? null,
+        career_summary: career.career_summary ?? null,
+      })
     }
 
     const rankingOutcomes = BAND_ORDER.map((band) => {
@@ -120,7 +121,7 @@ export async function GET() {
       const all = allBandMap[band]
       const colCount = col.wins.length
       const allCount = all.wins.length
-      const players = [...colBandPlayers[band]].sort(
+      const players = [...allBandPlayers[band]].sort(
         (a, b) => b.career_singles_wins - a.career_singles_wins
       )
       return {
