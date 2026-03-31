@@ -81,6 +81,12 @@ export async function GET() {
   const { data: recruits } = await supabase.from('recruits').select('id, name')
   const recruitList = recruits ?? []
 
+  // Pre-fetch all committed IDs to exclude from top30_uncommitted
+  const { data: committed } = await supabase
+    .from('tr_commitment_snapshots')
+    .select('tennisrecruiting_id')
+  const committedIds = new Set((committed || []).map(c => c.tennisrecruiting_id))
+
   // Get the two most recent snapshot dates
   const { data: dateRows, error: dateErr } = await supabase
     .from('tr_ranking_snapshots')
@@ -118,9 +124,9 @@ export async function GET() {
 
   const currentList: TRSnapshot[] = currentSnaps ?? []
 
-  // Top 30 uncommitted — current only
+  // Top 30 uncommitted — current only, exclude players committed in tr_commitment_snapshots
   const top30_uncommitted = currentList.filter(
-    p => p.ranking <= 30 && !p.committed_school
+    p => p.ranking <= 30 && !p.committed_school && !committedIds.has(p.tennisrecruiting_id)
   )
 
   if (!previousDate) {
