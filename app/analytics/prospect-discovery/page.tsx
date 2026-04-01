@@ -64,10 +64,31 @@ interface PipelineHealth {
   international: number
 }
 
+interface RisingPlayer {
+  name: string
+  tennisrecruiting_id: string
+  current_rank: number
+  previous_rank: number
+  rank_change: number
+  state: string | null
+  grad_year: number | null
+}
+
+interface UndervaluedPlayer {
+  name: string
+  current_rank: number
+  state: string | null
+  grad_year: number | null
+  comparable_avg_wins: number
+  comparable_count: number
+}
+
 interface DiscoveryData {
   rankingOutcomes: RankingOutcome[]
   prospects: Prospect[]
   pipelineHealth: PipelineHealth
+  risingPlayers: RisingPlayer[]
+  undervaluedPlayers: UndervaluedPlayer[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -375,7 +396,102 @@ export default function ProspectDiscoveryPage() {
               </div>
             </section>
 
-            {/* ── Section 2: Uncommitted Prospects Table ───────────────── */}
+            {/* ── Section 2: Opportunities ─────────────────────────────── */}
+            <section>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Opportunities</h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  Uncommitted prospects worth prioritising based on momentum and historical comparables
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Rising Fast */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-yellow-400 text-base">↑</span>
+                    <h3 className="text-sm font-semibold text-yellow-300">Rising Fast</h3>
+                    <span className="ml-auto text-xs text-slate-500">
+                      {data.risingPlayers.length} player{data.risingPlayers.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {data.risingPlayers.length === 0 ? (
+                    <p className="text-slate-600 text-xs text-center py-4">
+                      No significant movers in current snapshot window.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {data.risingPlayers.map((p) => (
+                        <div
+                          key={p.tennisrecruiting_id}
+                          className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-2.5"
+                        >
+                          <div>
+                            <p className="text-white text-sm font-medium">{p.name}</p>
+                            <p className="text-slate-500 text-xs mt-0.5">
+                              {p.state ?? '—'}{p.grad_year ? ` · ${p.grad_year}` : ''}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 text-right">
+                            <span className="text-slate-400 text-xs">
+                              #{p.previous_rank} → #{p.current_rank}
+                            </span>
+                            <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              ↑ {p.rank_change}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Undervalued */}
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-purple-400 text-base">◆</span>
+                    <h3 className="text-sm font-semibold text-purple-300">Undervalued</h3>
+                    <span className="ml-auto text-xs text-slate-500">
+                      {data.undervaluedPlayers.length} player{data.undervaluedPlayers.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs mb-4">
+                    Comparable players historically averaged more wins than ranking suggests
+                  </p>
+                  {data.undervaluedPlayers.length === 0 ? (
+                    <p className="text-slate-600 text-xs text-center py-4">
+                      No undervalued prospects identified.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {data.undervaluedPlayers.map((p, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-2.5"
+                        >
+                          <div>
+                            <p className="text-white text-sm font-medium">{p.name}</p>
+                            <p className="text-slate-500 text-xs mt-0.5">
+                              #{p.current_rank} · {p.state ?? '—'}{p.grad_year ? ` · ${p.grad_year}` : ''}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              Comps avg {p.comparable_avg_wins}w
+                            </span>
+                            <p className="text-slate-600 text-xs mt-1">
+                              {p.comparable_count} comp{p.comparable_count !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* ── Section 3: Uncommitted Prospects Table ───────────────── */}
             <section>
               <div className="mb-4">
                 <h2 className="text-lg font-semibold">Uncommitted Prospects</h2>

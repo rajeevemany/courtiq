@@ -261,6 +261,127 @@ interface EligibleProspect {
       return r > 15 && r <= 30
     }).length
 
+    // ── d. RISING PLAYERS ────────────────────────────────────────────────────
+    const { data: snapDates } = await supabase
+      .from('tr_ranking_snapshots')
+      .select('snapshot_date')
+      .order('snapshot_date', { ascending: false })
+
+    const distinctSnapDates = Array.from(
+      new Set((snapDates ?? []).map(r => r.snapshot_date))
+    ).sort((a, b) => b.localeCompare(a))
+
+    const risingCurrentDate = distinctSnapDates[0] ?? null
+    const risingPreviousDate = distinctSnapDates[1] ?? null
+
+    const { data: committedRows } = await supabase
+      .from('tr_commitment_snapshots')
+      .select('tennisrecruiting_id')
+    const committedSet = new Set((committedRows || []).map(c => c.tennisrecruiting_id))
+
+    let risingPlayers: {
+      name: string; tennisrecruiting_id: string
+      current_rank: number; previous_rank: number; rank_change: number
+      state: string | null; grad_year: number | null
+    }[] = []
+
+    if (risingCurrentDate && risingPreviousDate) {
+      const { data: risingCurrent } = await supabase
+        .from('tr_ranking_snapshots')
+        .select('tennisrecruiting_id, name, ranking, state, grad_year, committed_school')
+        .eq('snapshot_date', risingCurrentDate)
+        .is('committed_school', null)
+
+      const { data: risingPrev } = await supabase
+        .from('tr_ranking_snapshots')
+        .select('tennisrecruiting_id, ranking')
+        .eq('snapshot_date', risingPreviousDate)
+
+      const prevRankMap = new Map((risingPrev ?? []).map(p => [p.tennisrecruiting_id, p.ranking]))
+
+      risingPlayers = (risingCurrent ?? [])
+        .filter(p => !committedSet.has(p.tennisrecruiting_id))
+        .map(p => {
+          const prevRank = prevRankMap.get(p.tennisrecruiting_id)
+          if (prevRank == null) return null
+          const rankChange = prevRank - p.ranking
+          if (rankChange < 3) return null
+          return {
+            name: p.name,
+            tennisrecruiting_id: p.tennisrecruiting_id,
+            current_rank: p.ranking,
+            previous_rank: prevRank,
+            rank_change: rankChange,
+            state: p.state,
+            grad_year: p.grad_year,
+          }
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null)
+        .sort((a, b) => b.rank_change - a.rank_change)
+        .slice(0, 10)
+    }
+
+    // ── e. UNDERVALUED PLAYERS ────────────────────────────────────────────────
+    const top15AllAvgWins = (() => {
+      const band = allBandMap['1–15']
+      return band.wins.length
+        ? band.wins.reduce((a, b) => a + b, 0) / band.wins.length
+        : 0
+    })()
+    const threshold = top15AllAvgWins * 0.75
+
+    // Build comparable lookup from already-fetched allCareers + careerJuniors
+    // career → peak_ranking already in juniorRankMap
+
+    let undervaluedPlayers: {
+      name: string; current_rank: number; state: string | null
+      grad_year: number | null; comparable_avg_wins: number; comparable_count: number
+    }[] = []
+
+    if (latestDate) {
+      const { data: band1630Snaps } = await supabase
+        .from('tr_ranking_snapshots')
+        .select('tennisrecruiting_id, name, ranking, state, grad_year')
+        .eq('snapshot_date', latestDate)
+        .is('committed_school', null)
+        .gte('ranking', 16)
+        .lte('ranking', 30)
+
+      // Build in-memory comparable lookup: peak_ranking → wins[]
+      const rankToWins = new Map<number, number[]>()
+      for (const career of allCareers || []) {
+        const pr = juniorRankMap.get(career.junior_profile_id)
+        if (pr == null) continue
+        if (!rankToWins.has(pr)) rankToWins.set(pr, [])
+        rankToWins.get(pr)!.push(career.career_singles_wins!)
+      }
+
+      undervaluedPlayers = (band1630Snaps ?? [])
+        .filter(p => !committedSet.has(p.tennisrecruiting_id))
+        .map(p => {
+          const lo = p.ranking - 10
+          const hi = p.ranking + 10
+          const compWins: number[] = []
+          for (const [pr, wins] of rankToWins) {
+            if (pr >= lo && pr <= hi) compWins.push(...wins)
+          }
+          if (compWins.length === 0) return null
+          const avgWins = compWins.reduce((a, b) => a + b, 0) / compWins.length
+          if (avgWins < threshold) return null
+          return {
+            name: p.name,
+            current_rank: p.ranking,
+            state: p.state,
+            grad_year: p.grad_year,
+            comparable_avg_wins: Math.round(avgWins),
+            comparable_count: compWins.length,
+          }
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null)
+        .sort((a, b) => b.comparable_avg_wins - a.comparable_avg_wins)
+        .slice(0, 8)
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -271,6 +392,8 @@ interface EligibleProspect {
           top15: top15Count,
           band1630: band1630Count,
         },
+        risingPlayers,
+        undervaluedPlayers,
       },
     })
   } catch (error) {
