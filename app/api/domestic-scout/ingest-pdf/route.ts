@@ -88,10 +88,18 @@ export async function POST(request: Request) {
       )
     }
 
+    console.log('[ingest-pdf] fetching PDF from:', pdf_url)
+
     // Fetch PDF
     const pdfRes = await fetch(pdf_url)
     if (!pdfRes.ok) throw new Error(`Failed to fetch PDF: ${pdfRes.status}`)
-    const base64 = Buffer.from(await pdfRes.arrayBuffer()).toString('base64')
+    const arrayBuffer = await pdfRes.arrayBuffer()
+    console.log('[ingest-pdf] PDF fetched, size:', arrayBuffer.byteLength)
+
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    console.log('[ingest-pdf] base64 length:', base64.length)
+
+    console.log('[ingest-pdf] calling Claude...')
 
     // Extract rankings via Claude
     const message = await anthropic.messages.create({
@@ -133,7 +141,9 @@ Example of first few rows you should extract:
       ],
     })
 
+    console.log('[ingest-pdf] Claude response type:', message.content?.[0]?.type)
     const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    console.log('[ingest-pdf] Claude text preview:', text?.slice(0, 300))
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) {
       console.log('[ingest-pdf] Claude raw response:', text.slice(0, 500))
@@ -152,11 +162,9 @@ Example of first few rows you should extract:
     )
 
     return NextResponse.json({ success: true, ...result })
-  } catch (error) {
-    console.error('[domestic-scout/ingest-pdf] error:', error)
-    return NextResponse.json(
-      { error: (error as Error).message || 'Unknown error' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[ingest-pdf] unhandled error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
