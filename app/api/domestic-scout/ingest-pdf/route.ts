@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     // Extract rankings via Claude
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [
         {
           role: 'user',
@@ -144,18 +144,40 @@ Example of first few rows you should extract:
     console.log('[ingest-pdf] Claude response type:', message.content?.[0]?.type)
     const text = message.content[0].type === 'text' ? message.content[0].text : ''
     console.log('[ingest-pdf] Claude text preview:', text?.slice(0, 300))
-    const jsonMatch = text.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) {
-      console.log('[ingest-pdf] Claude raw response:', text.slice(0, 500))
+    let parsed: unknown[]
+    try {
+      // Try direct parse first
+      parsed = JSON.parse(text.trim())
+    } catch {
+      // Extract array and fix truncated JSON by finding last complete object
+      const arrayStart = text.indexOf('[')
+      if (arrayStart === -1) {
+        console.log('[ingest-pdf] No JSON array found. Raw:', text.slice(0, 1000))
+        return NextResponse.json({
+          error: 'No JSON array found in Claude response',
+          raw_response: text.slice(0, 1000),
+          text_length: text.length,
+        }, { status: 500 })
+      }
+      let jsonStr = text.slice(arrayStart)
+      if (!jsonStr.trimEnd().endsWith(']')) {
+        const lastBrace = jsonStr.lastIndexOf('}')
+        if (lastBrace !== -1) {
+          jsonStr = jsonStr.slice(0, lastBrace + 1) + ']'
+        }
+      }
+      parsed = JSON.parse(jsonStr)
+    }
+
+    if (!Array.isArray(parsed)) {
       return NextResponse.json({
         error: 'Claude did not return a JSON array',
         raw_response: text.slice(0, 1000),
         text_length: text.length,
       }, { status: 500 })
     }
-    const raw = jsonMatch[0]
 
-    const players: ExtractedPlayer[] = JSON.parse(raw)
+    const players = parsed as ExtractedPlayer[]
 
     const result = await crossReferenceAndUpsert(
       players, country_code, source_name, age_category, pdf_url
