@@ -1,4 +1,4 @@
-if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com') || window.location.href.includes('tennisrecruiting.net/list.asp')) {
+if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com') || window.location.href.includes('tennisrecruiting.net/list.asp') || window.location.href.includes('competitions.lta.org.uk') || window.location.href.includes('tenniseurope.org')) {
 
 function showToast(message, isError) {
   const existing = document.getElementById('courtiq-toast')
@@ -771,6 +771,113 @@ function extractPlayerData() {
     })
   }
 
+  function createDomesticRankingsCaptureButton() {
+    if (document.getElementById('courtiq-domestic-btn')) return
+
+    const DOMESTIC_SOURCES = {
+      'competitions.lta.org.uk': {
+        country_code: 'GBR',
+        source_name: 'LTA Rankings',
+        age_category: 'U18',
+      },
+      'www.tenniseurope.org': {
+        country_code: 'EUR',
+        source_name: 'Tennis Europe Rankings',
+        age_category: 'U16',
+      },
+    }
+
+    const hostname = window.location.hostname
+    const config = DOMESTIC_SOURCES[hostname]
+    if (!config) return
+
+    const btn = document.createElement('div')
+    btn.id = 'courtiq-domestic-btn'
+    btn.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      ">
+        <div id="courtiq-domestic-status" style="
+          display: none;
+          background: rgba(15,118,110,0.95);
+          color: white;
+          padding: 6px 14px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+        "></div>
+        <button id="courtiq-domestic-trigger" style="
+          background: #0f766e;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(15,118,110,0.4);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        ">
+          ✦ Capture Rankings
+        </button>
+      </div>
+    `
+    document.body.appendChild(btn)
+
+    document.getElementById('courtiq-domestic-trigger').addEventListener('click', async () => {
+      const trigger = document.getElementById('courtiq-domestic-trigger')
+      const statusEl = document.getElementById('courtiq-domestic-status')
+
+      trigger.textContent = 'Capturing...'
+      trigger.style.opacity = '0.7'
+      statusEl.style.display = 'block'
+      statusEl.textContent = 'Sending to CourtIQ…'
+
+      const API_BASE = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://courtiq-three.vercel.app'
+
+      try {
+        const res = await fetch(`${API_BASE}/api/domestic-scout/ingest-html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            html: document.body.innerHTML,
+            country_code: config.country_code,
+            source_name: config.source_name,
+            age_category: config.age_category,
+            source_url: window.location.href,
+          }),
+        })
+
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed')
+
+        const msg = `✓ ${json.extracted} players captured${json.hidden_gems ? ` · ${json.hidden_gems} hidden gems` : ''}`
+        statusEl.textContent = msg
+        showToast(msg, false)
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message || 'Error'}`
+        showToast('Capture failed: ' + (err.message || 'Unknown error'), true)
+      } finally {
+        trigger.textContent = '✦ Capture Rankings'
+        trigger.style.opacity = '1'
+        setTimeout(() => { statusEl.style.display = 'none' }, 5000)
+      }
+    })
+  }
+
   function initListButtons() {
     if (!window.location.href.includes('/list.asp')) return
     const urlId = new URLSearchParams(window.location.search).get('id') || ''
@@ -781,17 +888,31 @@ function extractPlayerData() {
     }
   }
 
+  const _hostname = window.location.hostname
+  const DOMESTIC_SOURCES_CHECK = {
+    'competitions.lta.org.uk': true,
+    'www.tenniseurope.org': true,
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      if (DOMESTIC_SOURCES_CHECK[_hostname]) {
+        createDomesticRankingsCaptureButton()
+      } else {
+        createButton()
+        createSyncButton()
+        createITFSyncButton()
+        initListButtons()
+      }
+    })
+  } else {
+    if (DOMESTIC_SOURCES_CHECK[_hostname]) {
+      createDomesticRankingsCaptureButton()
+    } else {
       createButton()
       createSyncButton()
       createITFSyncButton()
       initListButtons()
-    })
-  } else {
-    createButton()
-    createSyncButton()
-    createITFSyncButton()
-    initListButtons()
+    }
   }
 }

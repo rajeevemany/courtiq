@@ -92,6 +92,9 @@ export default async function Home() {
           <Link href="/itf-import" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             🌍 ITF Scout
           </Link>
+          <Link href="/domestic-scout" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
+            🌍 Domestic Scout
+          </Link>
           <Link href="/tr-scout" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             🎾 TR Scout
           </Link>

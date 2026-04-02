@@ -10,7 +10,9 @@
   "host_permissions": [
     "https://tennisrecruiting.net/*",
     "https://www.tennisrecruiting.net/*",
-    "https://www.itftennis.com/*"
+    "https://www.itftennis.com/*",
+    "https://competitions.lta.org.uk/*",
+    "https://www.tenniseurope.org/*"
   ],
   "content_scripts": [
     {
@@ -23,7 +25,9 @@
         "https://www.tennisrecruiting.net/player/activity.asp*",
         "https://tennisrecruiting.net/list.asp*",
         "https://www.itftennis.com/en/players/*/jt/s/activity",
-        "https://www.itftennis.com/en/players/*/jt/s/activity/*"
+        "https://www.itftennis.com/en/players/*/jt/s/activity/*",
+        "https://competitions.lta.org.uk/ranking/*",
+        "https://www.tenniseurope.org/ranking/*"
       ],
       "js": ["content.js"]
     }
