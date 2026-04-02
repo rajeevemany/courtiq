@@ -137,7 +137,11 @@ Example of first few rows you should extract:
     const jsonMatch = text.match(/\[[\s\S]*\]/)
     if (!jsonMatch) {
       console.log('[ingest-pdf] Claude raw response:', text.slice(0, 500))
-      throw new Error('Claude did not return a JSON array')
+      return NextResponse.json({
+        error: 'Claude did not return a JSON array',
+        raw_response: text.slice(0, 1000),
+        text_length: text.length,
+      }, { status: 500 })
     }
     const raw = jsonMatch[0]
 
