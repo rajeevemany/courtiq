@@ -74,6 +74,14 @@ interface RisingPlayer {
   grad_year: number | null
 }
 
+interface CompPlayer {
+  name: string
+  school: string
+  peak_ranking: number
+  career_singles_wins: number
+  career_singles_losses: number
+}
+
 interface UndervaluedPlayer {
   name: string
   current_rank: number
@@ -81,6 +89,7 @@ interface UndervaluedPlayer {
   grad_year: number | null
   comparable_avg_wins: number
   comparable_count: number
+  comparable_players: CompPlayer[]
 }
 
 interface DiscoveryData {
@@ -136,6 +145,7 @@ export default function ProspectDiscoveryPage() {
   const [selectedBand, setSelectedBand] = useState<string | null>(null)
   const [showColumbiaOnly, setShowColumbiaOnly] = useState(false)
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null)
+  const [expandedUndervalued, setExpandedUndervalued] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/analytics/prospect-discovery')
@@ -464,27 +474,63 @@ export default function ProspectDiscoveryPage() {
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {data.undervaluedPlayers.map((p, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-2.5"
-                        >
-                          <div>
-                            <p className="text-white text-sm font-medium">{p.name}</p>
-                            <p className="text-slate-500 text-xs mt-0.5">
-                              #{p.current_rank} · {p.state ?? '—'}{p.grad_year ? ` · ${p.grad_year}` : ''}
-                            </p>
+                      {data.undervaluedPlayers.map((p, i) => {
+                        const isExp = expandedUndervalued === p.name
+                        return (
+                          <div
+                            key={i}
+                            className="bg-white/5 rounded-xl overflow-hidden"
+                          >
+                            <div
+                              onClick={() => setExpandedUndervalued(isExp ? null : p.name)}
+                              className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-white/5 transition"
+                            >
+                              <div>
+                                <p className="text-white text-sm font-medium">{p.name}</p>
+                                <p className="text-slate-500 text-xs mt-0.5">
+                                  #{p.current_rank} · {p.state ?? '—'}{p.grad_year ? ` · ${p.grad_year}` : ''}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 text-right">
+                                <div>
+                                  <span className="bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                                    Comps avg {p.comparable_avg_wins}w
+                                  </span>
+                                  <p className="text-slate-600 text-xs mt-1">
+                                    {p.comparable_count} comp{p.comparable_count !== 1 ? 's' : ''}
+                                  </p>
+                                </div>
+                                <span className="text-slate-500 text-xs">{isExp ? '▲' : '▼'}</span>
+                              </div>
+                            </div>
+                            {isExp && (
+                              <div className="border-t border-white/5 px-4 py-3">
+                                <div className="grid grid-cols-[2fr_1.5fr_70px_90px] gap-x-3 text-xs uppercase tracking-widest text-slate-600 font-medium pb-1.5 mb-1 border-b border-white/5">
+                                  <span>Name</span>
+                                  <span>School</span>
+                                  <span>Rank</span>
+                                  <span>Record</span>
+                                </div>
+                                {p.comparable_players.map((c, j) => (
+                                  <div
+                                    key={j}
+                                    className="grid grid-cols-[2fr_1.5fr_70px_90px] gap-x-3 text-xs py-1.5 items-center"
+                                  >
+                                    <span className="text-slate-300 truncate">{c.name}</span>
+                                    <span className="text-slate-400 truncate">{c.school}</span>
+                                    <span className="text-slate-400">#{c.peak_ranking}</span>
+                                    <span>
+                                      <span className="text-green-400">{c.career_singles_wins}</span>
+                                      <span className="text-slate-600">–</span>
+                                      <span className="text-red-400">{c.career_singles_losses}</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <div className="text-right">
-                            <span className="bg-purple-500/20 text-purple-300 text-xs font-semibold px-2 py-0.5 rounded-full">
-                              Comps avg {p.comparable_avg_wins}w
-                            </span>
-                            <p className="text-slate-600 text-xs mt-1">
-                              {p.comparable_count} comp{p.comparable_count !== 1 ? 's' : ''}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
