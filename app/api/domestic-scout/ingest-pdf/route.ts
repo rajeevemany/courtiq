@@ -107,29 +107,41 @@ export async function POST(request: Request) {
             },
             {
               type: 'text',
-              text: `Extract the junior tennis rankings from this PDF. Return ONLY valid JSON array, no markdown:
+              text: `You are extracting data from a German tennis ranking PDF (DTB Rangliste).
+The format is: Rang | Name | Vorname | NAT | ID-Nr. | VBD | Verein | Punkte
+
+Extract ALL players. Return ONLY a raw JSON array with no markdown, no explanation, no code fences. Start your response with [ and end with ].
+
+Each object must have exactly these fields:
+{
+  "rank": <the Rang number as integer>,
+  "last_name": <the Name field>,
+  "first_name": <the Vorname field>,
+  "nationality": <the NAT field, e.g. GER>,
+  "birth_year": null,
+  "points": <the Punkte number>
+}
+
+Example of first few rows you should extract:
 [
-  {
-    "rank": number,
-    "last_name": string,
-    "first_name": string,
-    "nationality": string,
-    "birth_year": number or null,
-    "points": number or null
-  }
-]
-Extract all players listed. Last name comes first in most formats.`,
+  {"rank": 1, "last_name": "Dedura", "first_name": "Diego", "nationality": "GER", "birth_year": null, "points": 17516.0},
+  {"rank": 2, "last_name": "McDonald", "first_name": "Niels", "nationality": "GER", "birth_year": null, "points": 9338.0}
+]`,
             },
           ],
         },
       ],
     })
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text : ''
-    const jsonMatch = raw.match(/\[[\s\S]*\]/)
-    if (!jsonMatch) throw new Error('Claude did not return a JSON array')
+    const text = message.content[0].type === 'text' ? message.content[0].text : ''
+    const jsonMatch = text.match(/\[[\s\S]*\]/)
+    if (!jsonMatch) {
+      console.log('[ingest-pdf] Claude raw response:', text.slice(0, 500))
+      throw new Error('Claude did not return a JSON array')
+    }
+    const raw = jsonMatch[0]
 
-    const players: ExtractedPlayer[] = JSON.parse(jsonMatch[0])
+    const players: ExtractedPlayer[] = JSON.parse(raw)
 
     const result = await crossReferenceAndUpsert(
       players, country_code, source_name, age_category, pdf_url
