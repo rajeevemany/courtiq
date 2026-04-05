@@ -273,6 +273,44 @@ export default function DomesticScoutPage() {
           </div>
         </section>
 
+        {/* ── Chrome Extension Countries ───────────────────────────────── */}
+        <section>
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold">Chrome Extension Capture</h2>
+            <p className="text-slate-400 text-sm mt-1">
+              For Spain, France, Italy, Sweden and Netherlands — visit the national federation ranking page in Chrome and click the <span className="text-teal-400 font-medium">✦ Capture Rankings</span> button that appears. Rankings will be extracted automatically.
+            </p>
+          </div>
+
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                { flag: '🇪🇸', country: 'Spain', source: 'RFET Rankings', url: 'https://resultadostenis.isquad.es/1/ranking/1m', note: 'Navigate to junior rankings' },
+                { flag: '🇫🇷', country: 'France', source: 'FFT Rankings', url: 'https://www.fft.fr', note: 'Navigate to junior rankings' },
+                { flag: '🇮🇹', country: 'Italy', source: 'FITP Rankings', url: 'https://www.fitp.it', note: 'Navigate to classifiche' },
+                { flag: '🇸🇪', country: 'Sweden', source: 'Swedish Tennis', url: 'https://tennismail.se', note: 'Navigate to junior rankings' },
+                { flag: '🇳🇱', country: 'Netherlands', source: 'KNLTB Rankings', url: 'https://www.knltb.nl', note: 'Navigate to juniorenranglijst' },
+                { flag: '🇬🇧', country: 'UK', source: 'LTA Rankings', url: 'https://competitions.lta.org.uk/ranking/', note: 'Navigate to junior rankings' },
+              ].map(({ flag, country, source, url, note }) => (
+                <a
+                  key={country}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-3 bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 rounded-xl px-4 py-3 transition group"
+                >
+                  <span className="text-2xl leading-none mt-0.5">{flag}</span>
+                  <div>
+                    <p className="text-white text-sm font-medium group-hover:text-teal-300 transition">{country}</p>
+                    <p className="text-slate-500 text-xs mt-0.5">{source}</p>
+                    <p className="text-slate-600 text-xs mt-0.5 italic">{note}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ── Hidden Gems ───────────────────────────────────────────────── */}
         <section>
           <div className="mb-4 flex items-center justify-between">

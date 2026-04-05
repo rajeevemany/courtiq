@@ -12,7 +12,13 @@
     "https://www.tennisrecruiting.net/*",
     "https://www.itftennis.com/*",
     "https://competitions.lta.org.uk/*",
-    "https://www.tenniseurope.org/*"
+    "https://www.tenniseurope.org/*",
+    "https://resultadostenis.isquad.es/*",
+    "https://www.rfet.es/*",
+    "https://www.fft.fr/*",
+    "https://tennismail.se/*",
+    "https://www.knltb.nl/*",
+    "https://www.fitp.it/*"
   ],
   "content_scripts": [
     {
@@ -27,7 +33,13 @@
         "https://www.itftennis.com/en/players/*/jt/s/activity",
         "https://www.itftennis.com/en/players/*/jt/s/activity/*",
         "https://competitions.lta.org.uk/ranking/*",
-        "https://www.tenniseurope.org/ranking/*"
+        "https://www.tenniseurope.org/ranking/*",
+        "https://resultadostenis.isquad.es/*",
+        "https://www.rfet.es/*",
+        "https://www.fft.fr/*",
+        "https://tennismail.se/*",
+        "https://www.knltb.nl/*",
+        "https://www.fitp.it/*"
       ],
       "js": ["content.js"]
     }

@@ -785,6 +785,36 @@ function extractPlayerData() {
         source_name: 'Tennis Europe Rankings',
         age_category: 'U16',
       },
+      'resultadostenis.isquad.es': {
+        country_code: 'ESP',
+        source_name: 'RFET Rankings',
+        age_category: 'U18',
+      },
+      'www.rfet.es': {
+        country_code: 'ESP',
+        source_name: 'RFET Rankings',
+        age_category: 'U18',
+      },
+      'www.fft.fr': {
+        country_code: 'FRA',
+        source_name: 'FFT Rankings',
+        age_category: 'U18',
+      },
+      'tennismail.se': {
+        country_code: 'SWE',
+        source_name: 'Swedish Tennis Rankings',
+        age_category: 'U18',
+      },
+      'www.knltb.nl': {
+        country_code: 'NLD',
+        source_name: 'KNLTB Rankings',
+        age_category: 'U18',
+      },
+      'www.fitp.it': {
+        country_code: 'ITA',
+        source_name: 'FITP Rankings',
+        age_category: 'U18',
+      },
     }
 
     const hostname = window.location.hostname
@@ -892,6 +922,12 @@ function extractPlayerData() {
   const DOMESTIC_SOURCES_CHECK = {
     'competitions.lta.org.uk': true,
     'www.tenniseurope.org': true,
+    'resultadostenis.isquad.es': true,
+    'www.rfet.es': true,
+    'www.fft.fr': true,
+    'tennismail.se': true,
+    'www.knltb.nl': true,
+    'www.fitp.it': true,
   }
 
   if (document.readyState === 'loading') {
