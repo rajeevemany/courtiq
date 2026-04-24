@@ -389,41 +389,84 @@ export default function TRScoutPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {movements?.snapshot_dates.current && (
-            <span className="text-xs text-slate-500">
-              Last snapshot: {movements.snapshot_dates.current}
-              {movements.snapshot_dates.previous && (
-                <> · vs {movements.snapshot_dates.previous}</>
-              )}
-            </span>
-          )}
-
-          <button
-            onClick={handleFetchRankings}
-            disabled={fetchStatus === 'fetching'}
-            className={`text-sm font-semibold px-4 py-2 rounded-lg border transition-all ${
-              fetchStatus === 'fetching'
-                ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 cursor-wait'
-                : fetchStatus === 'done'
-                ? 'bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20 cursor-pointer'
-                : fetchStatus === 'error'
-                ? 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 cursor-pointer'
-                : 'bg-blue-600/20 text-blue-300 border-blue-500/30 hover:bg-blue-600/30 cursor-pointer'
-            }`}
-          >
-            {fetchStatus === 'fetching'
-              ? '⟳ Fetching Rankings…'
-              : fetchStatus === 'done'
-              ? `✓ Saved ${fetchResult?.snapshots_saved ?? 0} snapshots`
-              : fetchStatus === 'error'
-              ? '⚠ Retry Fetch'
-              : '↓ Fetch Latest Rankings'}
-          </button>
-        </div>
+        {movements?.snapshot_dates.current && (
+          <span className="text-xs text-slate-500">
+            Last snapshot: {movements.snapshot_dates.current}
+            {movements.snapshot_dates.previous && (
+              <> · vs {movements.snapshot_dates.previous}</>
+            )}
+          </span>
+        )}
       </div>
 
       <div className="px-8 py-6 max-w-7xl mx-auto">
+
+        {/* Sources Panel */}
+        <div className="mb-6 bg-white/5 border border-white/10 rounded-2xl p-5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">Open Source Pages</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <button
+                onClick={() => window.open('https://www.tennisrecruiting.net/recruiting/rankings.asp', '_blank')}
+                className="w-full text-left px-4 py-3 bg-teal-500/5 border border-teal-500/25 text-teal-300 rounded-xl hover:bg-teal-500/10 transition-colors font-medium text-sm cursor-pointer"
+              >
+                🎾 Junior Rankings (2026/2027/2028)
+              </button>
+              <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
+            </div>
+            <div>
+              <button
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1269', '_blank')}
+                className="w-full text-left px-4 py-3 bg-teal-500/5 border border-teal-500/25 text-teal-300 rounded-xl hover:bg-teal-500/10 transition-colors font-medium text-sm cursor-pointer"
+              >
+                🎓 Junior Commitments
+              </button>
+              <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
+            </div>
+            <div>
+              <button
+                onClick={() => window.open('https://www.tennisrecruiting.net/recruiting/senior_rankings.asp', '_blank')}
+                className="w-full text-left px-4 py-3 bg-blue-500/5 border border-blue-500/25 text-blue-300 rounded-xl hover:bg-blue-500/10 transition-colors font-medium text-sm cursor-pointer"
+              >
+                📊 Senior Rankings
+              </button>
+              <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
+            </div>
+            <div>
+              <button
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1279', '_blank')}
+                className="w-full text-left px-4 py-3 bg-blue-500/5 border border-blue-500/25 text-blue-300 rounded-xl hover:bg-blue-500/10 transition-colors font-medium text-sm cursor-pointer"
+              >
+                📋 Senior Commitments
+              </button>
+              <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
+            <p className="text-xs text-slate-500">Run server sync after capturing new data</p>
+            <button
+              onClick={handleFetchRankings}
+              disabled={fetchStatus === 'fetching'}
+              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${
+                fetchStatus === 'fetching'
+                  ? 'text-slate-500 border-white/10 cursor-wait'
+                  : fetchStatus === 'done'
+                  ? 'text-green-400 border-green-500/20 hover:bg-green-500/5 cursor-pointer'
+                  : fetchStatus === 'error'
+                  ? 'text-red-400 border-red-500/20 hover:bg-red-500/5 cursor-pointer'
+                  : 'text-slate-400 border-white/10 hover:text-slate-200 hover:border-white/20 cursor-pointer'
+              }`}
+            >
+              {fetchStatus === 'fetching'
+                ? '⟳ Syncing…'
+                : fetchStatus === 'done'
+                ? `✓ Synced ${fetchResult?.snapshots_saved ?? 0}`
+                : fetchStatus === 'error'
+                ? '⚠ Retry Sync'
+                : '↓ Sync from TR'}
+            </button>
+          </div>
+        </div>
 
         {/* Fetch status banners */}
         {fetchStatus === 'fetching' && (

@@ -3,484 +3,368 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
-interface Recruit {
-  id: string
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface TRMover {
+  tennisrecruiting_id: string
   name: string
-  class_year: number
-  national_ranking: number
-  location: string
+  ranking: number
+  state: string | null
+  grad_year: number | null
+  rank_change: number
+  previous_rank: number
+  committed_school: string | null
+  rating: string | null
+}
+
+interface ITFPlayer {
+  itf_player_id: string
+  name: string
   nationality: string
-  utr_rating: number | null
-  utr_trend: string
-  utr_trend_value: number
-  ranking_trend: string
-  ranking_trend_value: number
-  fit_score: number
-  priority: string
-  last_contacted: string | null
-  plays: string
-  tennisrecruiting_id: string | null
-  utr_history: { utr_rating: number, recorded_date: string }[]
-  ranking_history: { national_ranking: number, recorded_date: string }[]
+  ranking: number
+  rank_movement: number
+  birth_year: number | null
 }
 
-interface Prospect {
+interface DomesticPlayer {
   id: string
-  name: string
-  national_ranking: number | null
-  itf_ranking: number | null
-  class_year: number | null
-  location: string | null
-  nationality: string | null
-  tennisrecruiting_id: string | null
+  player_name: string
+  nationality: string
+  domestic_rank: number
+  country_code: string
   itf_player_id: string | null
-  rank_movement: number | null
-  is_rising: boolean
-  source: string
+  itf_ranking: number | null
+  birth_year: number | null
 }
 
-interface DiscoveryData {
-  all: Recruit[]
-  undervalued: Recruit[]
-  risingStars: Recruit[]
-  undercontacted: Recruit[]
-  risingRankings: Recruit[]
-  notInPipeline: Prospect[]
-}
+// ── Shared UI ─────────────────────────────────────────────────────────────────
 
-function TrendBadge({ trend, value }: { trend: string, value: number }) {
-  if (trend === 'rising') return (
-    <span className="text-xs font-semibold text-green-400">
-      ↑ +{value.toFixed(2)} UTR
-    </span>
-  )
-  if (trend === 'falling') return (
-    <span className="text-xs font-semibold text-red-400">
-      ↓ {value.toFixed(2)} UTR
-    </span>
-  )
-  return <span className="text-xs text-slate-500">→ Stable</span>
-}
-
-function RankingTrendBadge({ trend, value }: { trend: string, value: number }) {
-  if (trend === 'rising') return (
-    <span className="text-xs font-semibold text-emerald-400">
-      ↑ #{Math.abs(value)} rank
-    </span>
-  )
-  if (trend === 'falling') return (
-    <span className="text-xs font-semibold text-red-400">
-      ↓ #{Math.abs(value)} rank
-    </span>
-  )
-  return null
-}
-
-function RecruitCard({ recruit }: { recruit: Recruit }) {
-  const initials = recruit.name.split(' ').map(n => n[0]).join('')
+function SectionHeader({
+  title,
+  icon,
+  count,
+  accentColor,
+  viewAllHref,
+}: {
+  title: string
+  icon: string
+  count: number
+  accentColor: 'amber' | 'blue' | 'teal'
+  viewAllHref: string
+}) {
+  const borderColor = {
+    amber: 'border-l-amber-400',
+    blue: 'border-l-blue-400',
+    teal: 'border-l-teal-400',
+  }[accentColor]
 
   return (
-    <Link
-      href={`/recruits/${recruit.id}`}
-      className="flex items-center gap-4 p-4 bg-white/3 border border-white/5 rounded-xl hover:bg-white/8 transition-colors"
-    >
-      <div className="w-10 h-10 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300 flex-shrink-0">
-        {initials}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-white">{recruit.name}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {recruit.class_year} · #{recruit.national_ranking} · {recruit.location}
-        </p>
-        <div className="flex items-center gap-3 mt-1">
-          {recruit.utr_rating && (
-            <span className="text-xs text-slate-400">UTR {recruit.utr_rating}</span>
-          )}
-          <TrendBadge trend={recruit.utr_trend} value={recruit.utr_trend_value} />
-          <RankingTrendBadge trend={recruit.ranking_trend} value={recruit.ranking_trend_value} />
-        </div>
-      </div>
-      <div className="text-right flex-shrink-0">
-        <p className="text-sm font-semibold text-blue-400">{recruit.fit_score}</p>
-        <p className="text-xs text-slate-500">fit score</p>
-      </div>
-    </Link>
+    <div className={`border-l-2 pl-4 ${borderColor} flex items-center justify-between mb-4`}>
+      <h2 className="font-semibold text-white flex items-center gap-2">
+        <span>{icon}</span>
+        {title}
+        <span className="text-xs font-mono text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
+          {count}
+        </span>
+      </h2>
+      <Link href={viewAllHref} className="text-xs text-slate-500 hover:text-white transition-colors">
+        View all →
+      </Link>
+    </div>
   )
 }
 
-function ProspectCard({ prospect, onAdded }: { prospect: Prospect, onAdded: () => void }) {
-  const [adding, setAdding] = useState(false)
+function EmptyState({ message, linkHref, linkLabel }: { message: string; linkHref: string; linkLabel: string }) {
+  return (
+    <div className="py-8 text-center">
+      <p className="text-sm text-slate-500">{message}</p>
+      <Link href={linkHref} className="text-xs text-blue-400 hover:text-blue-300 mt-2 inline-block transition-colors">
+        {linkLabel} →
+      </Link>
+    </div>
+  )
+}
 
-  async function handleAdd() {
-    setAdding(true)
+// ── TR Scout Card ─────────────────────────────────────────────────────────────
+
+function TRCard({ player }: { player: TRMover }) {
+  const rankColor =
+    player.ranking <= 10
+      ? 'text-yellow-300'
+      : player.ranking <= 30
+      ? 'text-yellow-400'
+      : 'text-slate-300'
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-sm">{player.name}</span>
+          <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded">
+            ↑ +{player.rank_change}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className={`font-mono font-semibold text-sm ${rankColor}`}>#{player.ranking}</span>
+          <span className="text-xs text-slate-500">was #{player.previous_rank}</span>
+          {player.state && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.state}</span>
+          )}
+          {player.grad_year && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.grad_year}</span>
+          )}
+          {!player.committed_school && (
+            <span className="text-xs text-green-400 font-medium">Uncommitted</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── ITF Card ──────────────────────────────────────────────────────────────────
+
+function ITFCard({ player }: { player: ITFPlayer }) {
+  const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'error'>('idle')
+
+  async function addToPipeline() {
+    setStatus('adding')
     try {
       const res = await fetch('/api/recruits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: prospect.name,
-          class_year: prospect.class_year,
-          national_ranking: prospect.national_ranking,
-          location: prospect.location,
-          nationality: prospect.nationality || 'USA',
-          tennisrecruiting_id: prospect.tennisrecruiting_id,
+          name: player.name,
+          nationality: player.nationality,
+          class_year: player.birth_year ? player.birth_year + 18 : null,
           priority: 'Watch',
           fit_score: 50,
           competing_schools: [],
-          notes: prospect.source === 'itf'
-            ? `ITF Rank #${prospect.itf_ranking}. Imported from ITF junior rankings.`
-            : `Imported from tennisrecruiting.net top 200 scan.`,
+          notes: `ITF Rank #${player.ranking}${player.birth_year ? ` · Born ${player.birth_year}` : ''}. Imported from ITF junior rankings.`,
         }),
       })
-      if (!res.ok) throw new Error('Failed')
-      await fetch(`/api/prospects?id=${prospect.id}`, { method: 'DELETE' })
-      onAdded()
+      setStatus(res.ok ? 'added' : 'error')
     } catch {
-      setAdding(false)
+      setStatus('error')
     }
   }
 
-  const rankDisplay = prospect.source === 'itf'
-    ? `ITF #${prospect.itf_ranking}`
-    : `#${prospect.national_ranking}`
-
   return (
-    <div className="flex items-center gap-4 p-4 bg-white/3 border border-white/5 rounded-xl">
-      <div className="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-300 flex-shrink-0">
-        {prospect.name.split(' ').map(n => n[0]).join('')}
-      </div>
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-white">{prospect.name}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {prospect.class_year && `${prospect.class_year} · `}{rankDisplay}
-          {prospect.location && ` · ${prospect.location}`}
-          {prospect.nationality && ` · ${prospect.nationality}`}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-            prospect.source === 'itf'
-              ? 'bg-purple-900/40 text-purple-400'
-              : 'bg-blue-900/40 text-blue-400'
-          }`}>
-            {prospect.source === 'itf' ? 'ITF' : 'TR'}
-          </span>
-          {prospect.is_rising && (
-            <span className="text-xs font-semibold text-emerald-400">↑ Rising fast</span>
+        <div className="font-medium text-sm">{player.name}</div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="font-mono font-semibold text-sm text-blue-400">ITF #{player.ranking}</span>
+          <span className="text-xs text-slate-400">{player.nationality}</span>
+          {player.birth_year && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">b. {player.birth_year}</span>
           )}
-          {prospect.rank_movement !== null && prospect.rank_movement <= -10 && !prospect.is_rising && (
-            <span className="text-xs font-semibold text-emerald-400">↑ +{Math.abs(prospect.rank_movement)}</span>
+          {player.rank_movement < 0 && (
+            <span className="text-xs font-semibold text-green-400">↑ +{Math.abs(player.rank_movement)}</span>
           )}
         </div>
       </div>
       <button
-        onClick={handleAdd}
-        disabled={adding}
-        className="flex-shrink-0 text-xs font-semibold bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg transition-colors"
+        onClick={addToPipeline}
+        disabled={status === 'adding' || status === 'added'}
+        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
+          status === 'added'
+            ? 'bg-green-500/15 text-green-400 border-green-500/30 cursor-default'
+            : status === 'error'
+            ? 'bg-red-500/15 text-red-400 border-red-500/30'
+            : status === 'adding'
+            ? 'bg-white/5 text-slate-400 border-white/10 cursor-wait'
+            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-blue-500/10 hover:text-blue-300 hover:border-blue-500/30 cursor-pointer'
+        }`}
       >
-        {adding ? 'Adding...' : '+ Pipeline'}
+        {status === 'added' ? '✓ Added' : status === 'adding' ? 'Adding…' : status === 'error' ? 'Error' : '+ Pipeline'}
       </button>
     </div>
   )
 }
 
-export default function DiscoveryPage() {
-  const [data, setData] = useState<DiscoveryData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'undervalued' | 'rising' | 'risingRankings' | 'undercontacted' | 'all' | 'notInPipeline'>('undervalued')
-  const [showAddUTR, setShowAddUTR] = useState(false)
-  const [utrForm, setUtrForm] = useState({
-    recruit_id: '',
-    utr_rating: '',
-    recorded_date: new Date().toISOString().split('T')[0],
-  })
-  const [savingUTR, setSavingUTR] = useState(false)
+// ── Domestic Card ─────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    fetchDiscovery()
-  }, [])
+const COUNTRY_FLAG: Record<string, string> = {
+  DEU: '🇩🇪', GBR: '🇬🇧', FRA: '🇫🇷', ESP: '🇪🇸', ITA: '🇮🇹',
+  SWE: '🇸🇪', NED: '🇳🇱', AUT: '🇦🇹', NOR: '🇳🇴', SUI: '🇨🇭',
+}
 
-  async function fetchDiscovery() {
+function DomesticCard({ player }: { player: DomesticPlayer }) {
+  const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'error'>('idle')
+
+  async function addToPipeline() {
+    setStatus('adding')
     try {
-      const res = await fetch('/api/discovery')
-      const json = await res.json()
-      if (json.success) setData(json.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleAddUTR() {
-    setSavingUTR(true)
-    try {
-      const res = await fetch('/api/utr-history', {
+      const res = await fetch('/api/recruits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recruit_id: utrForm.recruit_id,
-          utr_rating: parseFloat(utrForm.utr_rating),
-          recorded_date: utrForm.recorded_date,
+          name: player.player_name,
+          nationality: player.country_code,
+          class_year: player.birth_year ? player.birth_year + 18 : null,
+          priority: 'Watch',
+          fit_score: 50,
+          competing_schools: [],
+          notes: `Domestic Rank #${player.domestic_rank}${player.itf_ranking ? ` · ITF #${player.itf_ranking}` : ''}. Hidden gem from domestic scout.`,
         }),
       })
-      const json = await res.json()
-      if (json.success) {
-        setShowAddUTR(false)
-        setUtrForm({
-          recruit_id: '',
-          utr_rating: '',
-          recorded_date: new Date().toISOString().split('T')[0],
-        })
-        fetchDiscovery()
-      }
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setSavingUTR(false)
+      setStatus(res.ok ? 'added' : 'error')
+    } catch {
+      setStatus('error')
     }
   }
 
-  const tabs = [
-    { key: 'undervalued',    label: 'Undervalued',       count: data?.undervalued.length || 0 },
-    { key: 'rising',         label: 'Rising Stars',       count: data?.risingStars.length || 0 },
-    { key: 'risingRankings', label: 'Rising Rankings',    count: data?.risingRankings.length || 0 },
-    { key: 'undercontacted', label: 'Under-contacted',    count: data?.undercontacted.length || 0 },
-    { key: 'all',            label: 'All Recruits',       count: data?.all.length || 0 },
-    { key: 'notInPipeline',  label: 'Not In Pipeline',    count: data?.notInPipeline.length || 0 },
-  ]
+  const flag = COUNTRY_FLAG[player.country_code] ?? '🌍'
 
-  const activeRecruits = activeTab === 'notInPipeline' ? null :
-    activeTab === 'undervalued'    ? data?.undervalued :
-    activeTab === 'rising'         ? data?.risingStars :
-    activeTab === 'risingRankings' ? data?.risingRankings :
-    activeTab === 'undercontacted' ? data?.undercontacted :
-    data?.all
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm">{player.player_name}</div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span>{flag}</span>
+          <span className="font-mono font-semibold text-sm text-teal-400">#{player.domestic_rank}</span>
+          <span className="text-xs text-slate-500">{player.nationality}</span>
+          {player.itf_ranking ? (
+            <span className="text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">
+              ITF #{player.itf_ranking}
+            </span>
+          ) : (
+            <span className="text-xs text-slate-600 bg-white/5 px-1.5 py-0.5 rounded">No ITF</span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={addToPipeline}
+        disabled={status === 'adding' || status === 'added'}
+        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
+          status === 'added'
+            ? 'bg-green-500/15 text-green-400 border-green-500/30 cursor-default'
+            : status === 'error'
+            ? 'bg-red-500/15 text-red-400 border-red-500/30'
+            : status === 'adding'
+            ? 'bg-white/5 text-slate-400 border-white/10 cursor-wait'
+            : 'bg-white/5 text-slate-300 border-white/10 hover:bg-teal-500/10 hover:text-teal-300 hover:border-teal-500/30 cursor-pointer'
+        }`}
+      >
+        {status === 'added' ? '✓ Added' : status === 'adding' ? 'Adding…' : status === 'error' ? 'Error' : '+ Pipeline'}
+      </button>
+    </div>
+  )
+}
 
-  const activeProspects = activeTab === 'notInPipeline' ? data?.notInPipeline : null
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function DiscoveryPage() {
+  const [trRising, setTrRising] = useState<TRMover[]>([])
+  const [itfPlayers, setItfPlayers] = useState<ITFPlayer[]>([])
+  const [domesticGems, setDomesticGems] = useState<DomesticPlayer[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/tr-scout/movements').then(r => r.json()),
+      fetch('/api/itf-cache').then(r => r.json()),
+      fetch('/api/domestic-scout/hidden-gems').then(r => r.json()),
+    ])
+      .then(([tr, itf, domestic]) => {
+        setTrRising((tr.rising ?? []).slice(0, 5))
+        setItfPlayers((itf.data ?? []).slice(0, 8))
+        setDomesticGems((domestic.data ?? []).slice(0, 6))
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
 
       {/* HEADER */}
-      <div className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-slate-400 hover:text-white transition-colors text-sm">
-            ← Dashboard
-          </Link>
-          <span className="text-white/20">/</span>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Scouting Discovery</h1>
-            <p className="text-sm text-slate-400 mt-0.5">Find undervalued players before anyone else</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowAddUTR(true)}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          + Log UTR Rating
-        </button>
+      <div className="border-b border-white/10 px-8 py-5">
+        <Link href="/" className="text-sm text-slate-400 hover:text-white transition-colors">
+          ← Dashboard
+        </Link>
+        <h1 className="text-xl font-semibold tracking-tight mt-1">✦ Scouting Intelligence</h1>
+        <p className="text-sm text-slate-400 mt-0.5">Rising prospects across all scouting channels</p>
       </div>
 
       <div className="px-8 py-6 max-w-5xl mx-auto">
-
-        {/* STATS */}
-        <div className="grid grid-cols-5 gap-4 mb-6">
-          {[
-            {
-              label: 'Rising Stars',
-              value: data?.risingStars.length || 0,
-              sub: 'UTR trending up 0.5+',
-              color: 'text-green-400'
-            },
-            {
-              label: 'Rising Rankings',
-              value: data?.risingRankings.length || 0,
-              sub: 'Rank improved 2+ places',
-              color: 'text-emerald-400'
-            },
-            {
-              label: 'Undervalued',
-              value: data?.undervalued.length || 0,
-              sub: 'High fit, not high priority',
-              color: 'text-yellow-400'
-            },
-            {
-              label: 'Under-contacted',
-              value: data?.undercontacted.length || 0,
-              sub: 'High fit, 14+ days no contact',
-              color: 'text-orange-400'
-            },
-            {
-              label: 'Not In Pipeline',
-              value: data?.notInPipeline.length || 0,
-              sub: 'Prospects not yet added',
-              color: 'text-purple-400'
-            },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-5">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-3">
-                {stat.label}
-              </p>
-              <p className="text-3xl font-semibold">{stat.value}</p>
-              <p className={`text-xs mt-1.5 font-medium ${stat.color}`}>{stat.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* TABS */}
-        <div className="flex gap-2 mb-4 flex-wrap">
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as typeof activeTab)}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                activeTab === tab.key
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {tab.label}
-              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                activeTab === tab.key ? 'bg-blue-500' : 'bg-white/10'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* LIST */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/10">
-            <p className="text-sm text-slate-400">
-              {activeTab === 'undervalued'    && 'Players in your target ranking range with high fit scores not yet marked High priority'}
-              {activeTab === 'rising'         && 'Players whose UTR has increased by 0.5 or more — trending up fast'}
-              {activeTab === 'risingRankings' && 'Players whose national ranking has improved by 2 or more places — climbing the charts'}
-              {activeTab === 'undercontacted' && 'High fit players you haven\'t reached out to recently'}
-              {activeTab === 'all'            && 'All recruits with UTR and ranking trend analysis'}
-              {activeTab === 'notInPipeline'  && 'Players ranked in the top 200 nationally or top ITF juniors not yet in your pipeline'}
-            </p>
+        {loading ? (
+          <div className="flex items-center justify-center py-20 text-slate-500 text-sm">
+            Loading intelligence…
           </div>
+        ) : (
+          <div className="flex flex-col gap-8">
 
-          {loading ? (
-            <div className="px-6 py-12 text-center text-slate-500">
-              <p className="text-sm">Loading discovery data...</p>
-            </div>
-          ) : activeProspects ? (
-            activeProspects.length === 0 ? (
-              <div className="px-6 py-12 text-center text-slate-500">
-                <p className="text-sm">No prospects found yet.</p>
-                <p className="text-xs mt-2">Run the ranking scan cron to populate prospects.</p>
+            {/* SECTION 1 — TR Scout */}
+            <div>
+              <SectionHeader
+                title="TR Scout: Rising & Uncommitted"
+                icon="↑"
+                count={trRising.length}
+                accentColor="amber"
+                viewAllHref="/tr-scout"
+              />
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                {trRising.length === 0 ? (
+                  <EmptyState
+                    message="No ranking movement data yet."
+                    linkHref="/tr-scout"
+                    linkLabel="Capture TR rankings first"
+                  />
+                ) : (
+                  trRising.map(p => <TRCard key={p.tennisrecruiting_id} player={p} />)
+                )}
               </div>
-            ) : (
-              <div className="p-4 flex flex-col gap-3">
-                {activeProspects.map(prospect => (
-                  <ProspectCard key={prospect.id} prospect={prospect} onAdded={fetchDiscovery} />
-                ))}
+            </div>
+
+            {/* SECTION 2 — ITF */}
+            <div>
+              <SectionHeader
+                title="ITF: International Prospects"
+                icon="◎"
+                count={itfPlayers.length}
+                accentColor="blue"
+                viewAllHref="/itf-import"
+              />
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                {itfPlayers.length === 0 ? (
+                  <EmptyState
+                    message="No ITF players cached yet."
+                    linkHref="/itf-import"
+                    linkLabel="Open ITF Import to fetch rankings"
+                  />
+                ) : (
+                  itfPlayers.map(p => <ITFCard key={p.itf_player_id} player={p} />)
+                )}
               </div>
-            )
-          ) : !activeRecruits || activeRecruits.length === 0 ? (
-            <div className="px-6 py-12 text-center text-slate-500">
-              <p className="text-sm">No recruits in this category yet.</p>
-              {activeTab === 'rising' && (
-                <p className="text-xs mt-2">Log multiple UTR ratings over time to track trends.</p>
-              )}
-              {activeTab === 'risingRankings' && (
-                <p className="text-xs mt-2">Rankings sync automatically every 24h for recruits with a TennisRecruiting ID.</p>
-              )}
             </div>
-          ) : (
-            <div className="p-4 flex flex-col gap-3">
-              {activeRecruits.map(recruit => (
-                <RecruitCard key={recruit.id} recruit={recruit} />
-              ))}
+
+            {/* SECTION 3 — Domestic Scout */}
+            <div>
+              <SectionHeader
+                title="Domestic Scout: Hidden Gems"
+                icon="◆"
+                count={domesticGems.length}
+                accentColor="teal"
+                viewAllHref="/domestic-scout"
+              />
+              <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                {domesticGems.length === 0 ? (
+                  <EmptyState
+                    message="No hidden gems found yet."
+                    linkHref="/domestic-scout"
+                    linkLabel="Import domestic rankings first"
+                  />
+                ) : (
+                  domesticGems.map(p => <DomesticCard key={p.id} player={p} />)
+                )}
+              </div>
             </div>
-          )}
-        </div>
+
+          </div>
+        )}
       </div>
-
-      {/* ADD UTR MODAL */}
-      {showAddUTR && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f2040] border border-white/15 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold text-white">Log UTR Rating</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Track UTR over time to spot trends</p>
-              </div>
-              <button
-                onClick={() => setShowAddUTR(false)}
-                className="text-slate-500 hover:text-white text-xl leading-none"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="px-6 py-5 flex flex-col gap-4">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                  Recruit
-                </label>
-                <select
-                  value={utrForm.recruit_id}
-                  onChange={e => setUtrForm(f => ({ ...f, recruit_id: e.target.value }))}
-                  className="w-full bg-[#0f2040] border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                >
-                  <option value="">Select a recruit...</option>
-                  {data?.all.map(r => (
-                    <option key={r.id} value={r.id} className="bg-[#0f2040]">
-                      {r.name} — #{r.national_ranking}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                    UTR Rating
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={utrForm.utr_rating}
-                    onChange={e => setUtrForm(f => ({ ...f, utr_rating: e.target.value }))}
-                    placeholder="e.g. 13.50"
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={utrForm.recorded_date}
-                    onChange={e => setUtrForm(f => ({ ...f, recorded_date: e.target.value }))}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-white/10 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowAddUTR(false)}
-                className="text-sm text-slate-400 hover:text-white px-4 py-2"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddUTR}
-                disabled={savingUTR || !utrForm.recruit_id || !utrForm.utr_rating}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-semibold px-6 py-2 rounded-lg transition-colors"
-              >
-                {savingUTR ? 'Saving...' : 'Log Rating'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   )
 }

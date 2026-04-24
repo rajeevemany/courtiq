@@ -6,6 +6,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+export async function GET() {
+  const [{ data: cached }, { data: recruits }] = await Promise.all([
+    supabase
+      .from('itf_players_cache')
+      .select('*')
+      .order('ranking', { ascending: true })
+      .limit(200),
+    supabase.from('recruits').select('name'),
+  ])
+
+  const recruitNames = new Set(
+    (recruits || []).map((r: { name: string }) => r.name.toLowerCase().trim())
+  )
+
+  const notInPipeline = (cached || []).filter(
+    (p: { name: string }) => !recruitNames.has(p.name.toLowerCase().trim())
+  )
+
+  return NextResponse.json({ success: true, data: notInPipeline })
+}
+
 interface ITFPlayer {
   playerId: string
   playerFamilyName: string
@@ -39,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   console.log('First player sample:', JSON.stringify(rows[0]))
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('itf_players_cache')
     .upsert(rows, { onConflict: 'itf_player_id' })
 
