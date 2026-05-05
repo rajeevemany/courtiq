@@ -264,9 +264,14 @@ export default function ITFImportPage() {
                   {/* Main info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm text-white">
+                      <a
+                        href={`https://www.itftennis.com/en/players/${(p.playerGivenName + '-' + p.playerFamilyName).toLowerCase().replace(/\s+/g, '-')}/${p.playerId}/${p.playerNationalityCode.toLowerCase()}/junior/rankings-results/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-sm text-white hover:underline transition-colors"
+                      >
                         {p.playerGivenName} {p.playerFamilyName}
-                      </p>
+                      </a>
                       {isRisingFast && (
                         <span className="text-xs font-semibold text-emerald-400">↑ Rising Fast</span>
                       )}

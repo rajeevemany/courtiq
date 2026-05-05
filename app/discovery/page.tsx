@@ -37,6 +37,18 @@ interface DomesticPlayer {
   birth_year: number | null
 }
 
+function getDomesticSearchUrl(playerName: string, countryCode: string): string {
+  const q = encodeURIComponent(playerName)
+  switch (countryCode) {
+    case 'DEU': return `https://www.tennis.de/spielen/spielersuche/?q=${q}`
+    case 'ESP': return `https://resultadostenis.isquad.es/1/jugadores/buscar?q=${q}`
+    case 'FRA': return `https://www.fft.fr/recherche?query=${q}`
+    case 'ITA': return `https://www.fitp.it/ricerca?q=${q}`
+    case 'GBR': return `https://www.lta.org.uk/fan-zone/british-tennis-players/search/?q=${q}`
+    default: return `https://www.google.com/search?q=${encodeURIComponent(playerName + ' tennis ' + countryCode.toLowerCase())}`
+  }
+}
+
 // ── Shared UI ─────────────────────────────────────────────────────────────────
 
 function SectionHeader({
@@ -99,7 +111,14 @@ function TRCard({ player }: { player: TRMover }) {
     <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm">{player.name}</span>
+          <a
+            href={`https://www.tennisrecruiting.net/player.asp?id=${player.tennisrecruiting_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-sm hover:underline hover:text-white transition-colors"
+          >
+            {player.name}
+          </a>
           <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded">
             ↑ +{player.rank_change}
           </span>
@@ -152,7 +171,14 @@ function ITFCard({ player }: { player: ITFPlayer }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm">{player.name}</div>
+        <a
+          href={`https://www.itftennis.com/en/players/${player.name.toLowerCase().replace(/\s+/g, '-')}/${player.itf_player_id}/${player.nationality.toLowerCase()}/junior/rankings-results/`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-sm hover:underline hover:text-white transition-colors"
+        >
+          {player.name}
+        </a>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="font-mono font-semibold text-sm text-blue-400">ITF #{player.ranking}</span>
           <span className="text-xs text-slate-400">{player.nationality}</span>
@@ -220,7 +246,14 @@ function DomesticCard({ player }: { player: DomesticPlayer }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm">{player.player_name}</div>
+        <a
+          href={getDomesticSearchUrl(player.player_name, player.country_code)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-sm hover:underline hover:text-white transition-colors"
+        >
+          {player.player_name}
+        </a>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span>{flag}</span>
           <span className="font-mono font-semibold text-sm text-teal-400">#{player.domestic_rank}</span>

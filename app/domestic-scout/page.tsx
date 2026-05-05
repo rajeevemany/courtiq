@@ -72,6 +72,18 @@ const COUNTRY_LABEL: Record<string, string> = {
   SUI: 'Switzerland',
 }
 
+function getDomesticSearchUrl(playerName: string, countryCode: string): string {
+  const q = encodeURIComponent(playerName)
+  switch (countryCode) {
+    case 'DEU': return `https://www.tennis.de/spielen/spielersuche/?q=${q}`
+    case 'ESP': return `https://resultadostenis.isquad.es/1/jugadores/buscar?q=${q}`
+    case 'FRA': return `https://www.fft.fr/recherche?query=${q}`
+    case 'ITA': return `https://www.fitp.it/ricerca?q=${q}`
+    case 'GBR': return `https://www.lta.org.uk/fan-zone/british-tennis-players/search/?q=${q}`
+    default: return `https://www.google.com/search?q=${encodeURIComponent(playerName + ' tennis ' + countryCode.toLowerCase())}`
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function DomesticScoutPage() {
@@ -359,7 +371,14 @@ export default function DomesticScoutPage() {
                   className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 flex flex-col gap-2"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold text-white text-sm leading-tight">{p.player_name}</p>
+                    <a
+                      href={getDomesticSearchUrl(p.player_name, p.country_code)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-white text-sm leading-tight hover:underline hover:text-white transition-colors"
+                    >
+                      {p.player_name}
+                    </a>
                     <span className="text-xs bg-yellow-400/15 text-yellow-300 px-2 py-0.5 rounded-full whitespace-nowrap">
                       ⭐ Hidden Gem
                     </span>
