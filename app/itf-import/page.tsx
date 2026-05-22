@@ -14,6 +14,20 @@ const ALLOWED_NATIONALITIES = new Set([
 
 const ITF_URL = 'https://www.itftennis.com/tennis/api/PlayerRankApi/GetPlayerRankings?circuitCode=JT&playerTypeCode=B&ageCategoryCode=&juniorRankingType=itf&take=600&skip=0&isOrderAscending=true'
 
+function buildITFProfileUrl(name: string, itfPlayerId: string | null | undefined, nationality: string): string {
+  if (!itfPlayerId) {
+    return `https://www.itftennis.com/en/players/?query=${encodeURIComponent(name)}`
+  }
+  const slug = name.toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+  const nat = nationality.toLowerCase()
+  return `https://www.itftennis.com/en/players/${slug}/${itfPlayerId}/${nat}/jt/s/overview/`
+}
+
 // Threshold values: -1 = no filter, otherwise filter to rankMovement <= -threshold
 const MOVEMENT_OPTIONS = [
   { label: 'Any movement',  value: -1  },
@@ -265,7 +279,7 @@ export default function ITFImportPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <a
-                        href={`https://www.itftennis.com/en/players/${(p.playerGivenName + '-' + p.playerFamilyName).toLowerCase().replace(/\s+/g, '-')}/${p.playerId}/${p.playerNationalityCode.toLowerCase()}/junior/rankings-results/`}
+                        href={buildITFProfileUrl(`${p.playerGivenName} ${p.playerFamilyName}`, p.playerId, p.playerNationalityCode)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-sm text-white hover:underline transition-colors"

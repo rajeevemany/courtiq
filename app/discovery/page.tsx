@@ -37,6 +37,20 @@ interface DomesticPlayer {
   birth_year: number | null
 }
 
+function buildITFProfileUrl(name: string, itfPlayerId: string | null | undefined, nationality: string): string {
+  if (!itfPlayerId) {
+    return `https://www.itftennis.com/en/players/?query=${encodeURIComponent(name)}`
+  }
+  const slug = name.toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+  const nat = nationality.toLowerCase()
+  return `https://www.itftennis.com/en/players/${slug}/${itfPlayerId}/${nat}/jt/s/overview/`
+}
+
 function getDomesticSearchUrl(playerName: string, countryCode: string): string {
   const q = encodeURIComponent(playerName)
   switch (countryCode) {
@@ -172,7 +186,7 @@ function ITFCard({ player }: { player: ITFPlayer }) {
     <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
         <a
-          href={`https://www.itftennis.com/en/players/${player.name.toLowerCase().replace(/\s+/g, '-')}/${player.itf_player_id}/${player.nationality.toLowerCase()}/junior/rankings-results/`}
+          href={buildITFProfileUrl(player.name, player.itf_player_id, player.nationality)}
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-sm hover:underline hover:text-white transition-colors"
