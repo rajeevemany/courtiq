@@ -114,6 +114,13 @@ ${plainText}`,
 }
 
 export async function POST(_req: NextRequest) {
+  if (process.env.VERCEL) {
+    return NextResponse.json({
+      error: 'Server-side fetch unavailable on Vercel. Use the Chrome extension to capture rankings directly from tennisrecruiting.net.',
+      use_extension: true,
+    }, { status: 503 })
+  }
+
   try {
     const today = new Date().toISOString().split('T')[0]
 

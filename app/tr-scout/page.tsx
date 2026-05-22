@@ -324,6 +324,7 @@ export default function TRScoutPage() {
     snapshots_saved?: number
     movers?: TRPlayer[]
     error?: string
+    use_extension?: boolean
   } | null>(null)
 
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -367,7 +368,7 @@ export default function TRScoutPage() {
         await loadMovements()
       } else {
         setFetchStatus('error')
-        setFetchResult({ error: data.error ?? 'Unknown error' })
+        setFetchResult({ error: data.error ?? 'Unknown error', use_extension: data.use_extension })
       }
     } catch (err) {
       setFetchStatus('error')
@@ -416,10 +417,10 @@ export default function TRScoutPage() {
             </div>
             <div>
               <button
-                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1269', '_blank')}
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1279', '_blank')}
                 className="w-full text-left px-4 py-3 bg-teal-500/5 border border-teal-500/25 text-teal-300 rounded-xl hover:bg-teal-500/10 transition-colors font-medium text-sm cursor-pointer"
               >
-                🎓 Junior Commitments
+                📝 Junior Commitments
               </button>
               <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
             </div>
@@ -428,16 +429,25 @@ export default function TRScoutPage() {
                 onClick={() => window.open('https://www.tennisrecruiting.net/recruiting/senior_rankings.asp', '_blank')}
                 className="w-full text-left px-4 py-3 bg-blue-500/5 border border-blue-500/25 text-blue-300 rounded-xl hover:bg-blue-500/10 transition-colors font-medium text-sm cursor-pointer"
               >
-                📊 Senior Rankings
+                🎓 Senior Rankings
               </button>
               <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
             </div>
             <div>
               <button
-                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1279', '_blank')}
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1269', '_blank')}
                 className="w-full text-left px-4 py-3 bg-blue-500/5 border border-blue-500/25 text-blue-300 rounded-xl hover:bg-blue-500/10 transition-colors font-medium text-sm cursor-pointer"
               >
                 📋 Senior Commitments
+              </button>
+              <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
+            </div>
+            <div>
+              <button
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1285', '_blank')}
+                className="w-full text-left px-4 py-3 bg-teal-500/5 border border-teal-500/25 text-teal-300 rounded-xl hover:bg-teal-500/10 transition-colors font-medium text-sm cursor-pointer"
+              >
+                📚 Sophomore Rankings
               </button>
               <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
             </div>
@@ -480,7 +490,11 @@ export default function TRScoutPage() {
 
         {fetchStatus === 'error' && fetchResult?.error && (
           <div className="mb-5 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3">
-            <p className="text-red-300 text-sm font-medium">⚠ Fetch failed: {fetchResult.error}</p>
+            <p className="text-red-300 text-sm font-medium">
+              {fetchResult.use_extension
+                ? 'Use Chrome extension to capture — open the TR links above'
+                : `⚠ Fetch failed: ${fetchResult.error}`}
+            </p>
           </div>
         )}
 
