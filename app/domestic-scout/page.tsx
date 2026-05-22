@@ -21,6 +21,7 @@ interface DomesticPlayer {
   snapshot_date: string
   itf_player_id: string | null
   itf_ranking: number | null
+  itf_name: string | null
   is_hidden_gem: boolean
   created_at: string
 }
@@ -396,7 +397,7 @@ export default function DomesticScoutPage() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {p.itf_ranking == null ? (
                       <span className="text-xs text-red-400 font-medium">No ITF ranking</span>
                     ) : (
@@ -405,6 +406,11 @@ export default function DomesticScoutPage() {
                     <span className="text-slate-600 text-xs">·</span>
                     <span className="text-xs text-slate-500">{p.source_name}</span>
                   </div>
+                  {p.itf_name && p.itf_name.toLowerCase() !== p.player_name.toLowerCase() && (
+                    <p className="text-xs text-slate-500 italic">
+                      ITF: {p.itf_name}
+                    </p>
+                  )}
 
                   <button
                     onClick={async () => {

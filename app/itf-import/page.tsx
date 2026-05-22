@@ -87,14 +87,15 @@ export default function ITFImportPage() {
       .filter(p => {
         if (countryFilter !== 'all' && p.playerNationalityCode !== countryFilter) return false
         if (birthYearFilter !== 'all' && p.birthYear !== parseInt(birthYearFilter)) return false
-        if (movementThreshold !== -1 && p.rankMovement > -movementThreshold) return false
+        if (p.rankMovement <= 0) return false // positive = improved (old_rank - new_rank > 0)
+        if (movementThreshold !== -1 && p.rankMovement < movementThreshold) return false
         return true
       })
-      .sort((a, b) => a.rankMovement - b.rankMovement) // most improved first
+      .sort((a, b) => b.rankMovement - a.rankMovement) // most improved first
   }, [allPlayers, countryFilter, birthYearFilter, movementThreshold])
 
   const movingUp10Count = useMemo(
-    () => displayed.filter(p => p.rankMovement <= -10).length,
+    () => displayed.filter(p => p.rankMovement >= 10).length,
     [displayed]
   )
 
@@ -257,7 +258,7 @@ export default function ITFImportPage() {
         {displayed.length > 0 && (
           <div className="flex flex-col gap-3">
             {displayed.map(p => {
-              const isRisingFast = p.rankMovement <= -20
+              const isRisingFast = p.rankMovement >= 20
               const isAdded  = added.has(p.playerId)
               const isAdding = adding.has(p.playerId)
 
@@ -300,16 +301,8 @@ export default function ITFImportPage() {
                   </div>
 
                   {/* Movement badge */}
-                  <div className={`text-sm font-semibold tabular-nums flex-shrink-0 w-16 text-right ${
-                    p.rankMovement < 0 ? 'text-emerald-400' :
-                    p.rankMovement > 0 ? 'text-red-400' :
-                    'text-slate-600'
-                  }`}>
-                    {p.rankMovement === 0
-                      ? '—'
-                      : p.rankMovement < 0
-                      ? `↑ ${Math.abs(p.rankMovement)}`
-                      : `↓ ${p.rankMovement}`}
+                  <div className="text-sm font-semibold tabular-nums flex-shrink-0 w-16 text-right text-emerald-400">
+                    ↑ {p.rankMovement}
                   </div>
 
                   {/* Add button */}

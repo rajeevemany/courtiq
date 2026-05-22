@@ -18,6 +18,47 @@ interface ExtractedPlayer {
   points: number | null
 }
 
+interface ITFCacheRow { itf_player_id: string; ranking: number; name: string }
+
+async function findITFMatch(last_name: string, first_name: string): Promise<ITFCacheRow | null> {
+  const sel = 'itf_player_id, ranking, name'
+
+  // Strategy 1: substring on full last name
+  const { data: s1 } = await supabase
+    .from('itf_players_cache')
+    .select(sel)
+    .ilike('name', `%${last_name}%`)
+    .limit(3)
+  if (s1?.length) return s1[0]
+
+  // Strategy 2: each part of a hyphenated last name
+  if (last_name.includes('-')) {
+    for (const part of last_name.split('-')) {
+      if (part.length < 3) continue
+      const { data: s2 } = await supabase
+        .from('itf_players_cache')
+        .select(sel)
+        .ilike('name', `%${part}%`)
+        .limit(3)
+      if (s2?.length) return s2[0]
+    }
+  }
+
+  // Strategy 3: first_name AND first part of last_name (AND-combined ilike)
+  if (first_name) {
+    const lastPart = last_name.split('-')[0]
+    const { data: s3 } = await supabase
+      .from('itf_players_cache')
+      .select(sel)
+      .ilike('name', `%${first_name}%`)
+      .ilike('name', `%${lastPart}%`)
+      .limit(1)
+    if (s3?.length) return s3[0]
+  }
+
+  return null
+}
+
 async function crossReferenceAndUpsert(
   players: ExtractedPlayer[],
   country_code: string,
@@ -29,20 +70,22 @@ async function crossReferenceAndUpsert(
   let matched_itf = 0
   let hidden_gems = 0
 
+  // Clear stale records for this country/age/date before inserting fresh batch
+  await supabase
+    .from('domestic_rankings')
+    .delete()
+    .eq('country_code', country_code)
+    .eq('age_category', age_category)
+    .eq('snapshot_date', snapshot_date)
+
   const rows = await Promise.all(
     players.map(async (p) => {
       const player_name = `${p.first_name} ${p.last_name}`.trim()
 
-      // Cross-reference ITF cache by last name
-      const { data: itfMatches } = await supabase
-        .from('itf_players_cache')
-        .select('itf_player_id, ranking')
-        .ilike('name', `%${p.last_name}%`)
-        .limit(1)
-
-      const itfMatch = itfMatches?.[0] ?? null
+      const itfMatch = await findITFMatch(p.last_name, p.first_name)
       const itf_player_id = itfMatch?.itf_player_id ?? null
       const itf_ranking: number | null = itfMatch?.ranking ?? null
+      const itf_name: string | null = itfMatch?.name ?? null
 
       if (itfMatch) matched_itf++
 
@@ -65,6 +108,7 @@ async function crossReferenceAndUpsert(
         snapshot_date,
         itf_player_id,
         itf_ranking,
+        itf_name,
         is_hidden_gem,
       }
     })
@@ -177,7 +221,14 @@ Example of first few rows you should extract:
       }, { status: 500 })
     }
 
-    const players = parsed as ExtractedPlayer[]
+    // Deduplicate by last_name+first_name (case-insensitive) — handles double entries in PDF
+    const seen = new Set<string>()
+    const players = (parsed as ExtractedPlayer[]).filter(p => {
+      const key = `${p.last_name}${p.first_name}`.toLowerCase().replace(/\s/g, '')
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 
     const result = await crossReferenceAndUpsert(
       players, country_code, source_name, age_category, pdf_url

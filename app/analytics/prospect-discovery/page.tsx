@@ -350,7 +350,7 @@ export default function ProspectDiscoveryPage() {
                             <span>School</span>
                             <span>Jr Rank</span>
                             <span>Career</span>
-                            <span>Peak ITA</span>
+                            <span title="Singles ranking where available">Peak ITA *</span>
                             <span>Summary</span>
                             <span />
                           </div>
@@ -403,6 +403,7 @@ export default function ProspectDiscoveryPage() {
                     </div>
                   )
                 })()}
+                <p className="text-xs text-slate-600 mt-3 px-1">* Peak ITA: singles ranking where available</p>
               </div>
             </section>
 
