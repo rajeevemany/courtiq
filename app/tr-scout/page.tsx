@@ -319,14 +319,6 @@ function CommitmentsSection({ players }: { players: TRCommitment[] }) {
 }
 
 export default function TRScoutPage() {
-  const [fetchStatus, setFetchStatus] = useState<'idle' | 'fetching' | 'done' | 'error'>('idle')
-  const [fetchResult, setFetchResult] = useState<{
-    snapshots_saved?: number
-    movers?: TRPlayer[]
-    error?: string
-    use_extension?: boolean
-  } | null>(null)
-
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
 
   const [movements, setMovements] = useState<MovementsData | null>(null)
@@ -354,27 +346,6 @@ export default function TRScoutPage() {
   useEffect(() => {
     loadMovements()
   }, [loadMovements])
-
-  async function handleFetchRankings() {
-    setFetchStatus('fetching')
-    setFetchResult(null)
-    try {
-      const res = await fetch('/api/tr-scout/fetch-rankings', { method: 'POST' })
-      const data = await res.json()
-      if (res.ok) {
-        setFetchStatus('done')
-        setFetchResult(data)
-        // Reload movements after a successful fetch
-        await loadMovements()
-      } else {
-        setFetchStatus('error')
-        setFetchResult({ error: data.error ?? 'Unknown error', use_extension: data.use_extension })
-      }
-    } catch (err) {
-      setFetchStatus('error')
-      setFetchResult({ error: String(err) })
-    }
-  }
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
@@ -408,10 +379,10 @@ export default function TRScoutPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <button
-                onClick={() => window.open('https://www.tennisrecruiting.net/recruiting/rankings.asp', '_blank')}
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1275', '_blank')}
                 className="w-full text-left px-4 py-3 bg-teal-500/5 border border-teal-500/25 text-teal-300 rounded-xl hover:bg-teal-500/10 transition-colors font-medium text-sm cursor-pointer"
               >
-                🎾 Junior Rankings (2026/2027/2028)
+                🎾 Junior Rankings
               </button>
               <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
             </div>
@@ -426,7 +397,7 @@ export default function TRScoutPage() {
             </div>
             <div>
               <button
-                onClick={() => window.open('https://www.tennisrecruiting.net/recruiting/senior_rankings.asp', '_blank')}
+                onClick={() => window.open('https://www.tennisrecruiting.net/list.asp?id=1265', '_blank')}
                 className="w-full text-left px-4 py-3 bg-blue-500/5 border border-blue-500/25 text-blue-300 rounded-xl hover:bg-blue-500/10 transition-colors font-medium text-sm cursor-pointer"
               >
                 🎓 Senior Rankings
@@ -452,62 +423,7 @@ export default function TRScoutPage() {
               <p className="text-xs text-slate-500 mt-1.5 px-1">Then use Chrome extension to capture</p>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-            <p className="text-xs text-slate-500">Run server sync after capturing new data</p>
-            <button
-              onClick={handleFetchRankings}
-              disabled={fetchStatus === 'fetching'}
-              className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${
-                fetchStatus === 'fetching'
-                  ? 'text-slate-500 border-white/10 cursor-wait'
-                  : fetchStatus === 'done'
-                  ? 'text-green-400 border-green-500/20 hover:bg-green-500/5 cursor-pointer'
-                  : fetchStatus === 'error'
-                  ? 'text-red-400 border-red-500/20 hover:bg-red-500/5 cursor-pointer'
-                  : 'text-slate-400 border-white/10 hover:text-slate-200 hover:border-white/20 cursor-pointer'
-              }`}
-            >
-              {fetchStatus === 'fetching'
-                ? '⟳ Syncing…'
-                : fetchStatus === 'done'
-                ? `✓ Synced ${fetchResult?.snapshots_saved ?? 0}`
-                : fetchStatus === 'error'
-                ? '⚠ Retry Sync'
-                : '↓ Sync from TR'}
-            </button>
-          </div>
         </div>
-
-        {/* Fetch status banners */}
-        {fetchStatus === 'fetching' && (
-          <div className="mb-5 bg-blue-500/10 border border-blue-500/30 rounded-xl px-5 py-3 flex items-center gap-3">
-            <span className="text-blue-400 text-lg animate-spin">⟳</span>
-            <p className="text-blue-300 text-sm font-medium">
-              Scraping TennisRecruiting.net for grad years 2025–2028. This takes 30–60 seconds…
-            </p>
-          </div>
-        )}
-
-        {fetchStatus === 'error' && fetchResult?.error && (
-          <div className="mb-5 bg-red-500/10 border border-red-500/30 rounded-xl px-5 py-3">
-            <p className="text-red-300 text-sm font-medium">
-              {fetchResult.use_extension
-                ? 'Use Chrome extension to capture — open the TR links above'
-                : `⚠ Fetch failed: ${fetchResult.error}`}
-            </p>
-          </div>
-        )}
-
-        {fetchStatus === 'done' && (
-          <div className="mb-5 bg-green-500/10 border border-green-500/30 rounded-xl px-5 py-3">
-            <p className="text-green-300 text-sm font-medium">
-              ✓ Saved {fetchResult?.snapshots_saved ?? 0} snapshots across grad years 2025–2028.{' '}
-              {(fetchResult?.movers?.length ?? 0) > 0
-                ? `${fetchResult!.movers!.length} movers detected.`
-                : 'No significant movers vs previous snapshot.'}
-            </p>
-          </div>
-        )}
 
         {/* Movements error */}
         {movementsError && (
