@@ -12,11 +12,21 @@ export async function GET() {
       .from('domestic_rankings')
       .select('*')
       .eq('is_hidden_gem', true)
-      .order('domestic_rank', { ascending: true })
+      .order('snapshot_date', { ascending: false })
 
-    if (error) throw error
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ success: true, data: data ?? [] })
+    // Keep only the latest snapshot per player+country+age
+    const seen = new Map<string, NonNullable<typeof data>[0]>()
+    for (const row of data ?? []) {
+      const key = `${row.player_name}|${row.country_code}|${row.age_category}`
+      if (!seen.has(key)) seen.set(key, row)
+    }
+
+    const deduped = Array.from(seen.values())
+      .sort((a, b) => a.domestic_rank - b.domestic_rank)
+
+    return NextResponse.json({ success: true, data: deduped })
   } catch (error) {
     console.error('[domestic-scout/hidden-gems] error:', error)
     return NextResponse.json(

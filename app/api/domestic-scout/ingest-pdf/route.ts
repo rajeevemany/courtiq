@@ -22,6 +22,7 @@ interface ITFCacheRow { itf_player_id: string; ranking: number; name: string }
 
 async function findITFMatch(last_name: string, first_name: string): Promise<ITFCacheRow | null> {
   const sel = 'itf_player_id, ranking, name'
+  console.log('[itf-match] searching for:', last_name, first_name)
 
   // Strategy 1: substring on full last name
   const { data: s1 } = await supabase
@@ -29,7 +30,10 @@ async function findITFMatch(last_name: string, first_name: string): Promise<ITFC
     .select(sel)
     .ilike('name', `%${last_name}%`)
     .limit(3)
-  if (s1?.length) return s1[0]
+  if (s1?.length) {
+    console.log('[itf-match] s1 result:', s1[0].name, s1[0].ranking)
+    return s1[0]
+  }
 
   // Strategy 2: each part of a hyphenated last name
   if (last_name.includes('-')) {
@@ -40,7 +44,10 @@ async function findITFMatch(last_name: string, first_name: string): Promise<ITFC
         .select(sel)
         .ilike('name', `%${part}%`)
         .limit(3)
-      if (s2?.length) return s2[0]
+      if (s2?.length) {
+        console.log('[itf-match] s2 result:', s2[0].name, s2[0].ranking)
+        return s2[0]
+      }
     }
   }
 
@@ -53,9 +60,13 @@ async function findITFMatch(last_name: string, first_name: string): Promise<ITFC
       .ilike('name', `%${first_name}%`)
       .ilike('name', `%${lastPart}%`)
       .limit(1)
-    if (s3?.length) return s3[0]
+    if (s3?.length) {
+      console.log('[itf-match] s3 result:', s3[0].name, s3[0].ranking)
+      return s3[0]
+    }
   }
 
+  console.log('[itf-match] no match found for:', last_name, first_name)
   return null
 }
 
