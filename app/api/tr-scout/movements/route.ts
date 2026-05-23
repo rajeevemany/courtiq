@@ -229,9 +229,7 @@ export async function GET() {
   const sophToJunior: SophToJuniorPlayer[] = (yearOverYear || [])
     .filter(p =>
       Number(p.ranking_yr2) > 0 &&
-      Number(p.ranking_yr3) > 0 &&
-      Number(p.committed_year) >= 2025 &&
-      !committedIds.has(p.tennisrecruiting_id)
+      Number(p.ranking_yr3) > 0
     )
     .map(p => ({
       name: p.name,
