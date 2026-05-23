@@ -10,13 +10,16 @@ const supabase = createClient(
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params
+    const body = await request.json().catch(() => ({}))
 
-    // Fetch recruit
+    const contactType: 'initial' | 'followup' = body.contactType ?? 'initial'
+    const outreachFormat: 'email' | 'text' = body.outreachFormat ?? 'email'
+
     const { data: recruit, error: recruitError } = await supabase
       .from('recruits')
       .select('*')
@@ -27,74 +30,75 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Recruit not found' }, { status: 404 })
     }
 
-    // Fetch interactions (most recent first)
-    const { data: interactions } = await supabase
-      .from('interactions')
-      .select('*')
-      .eq('recruit_id', id)
-      .order('date', { ascending: false })
+    const recruitName = recruit.name
+    const peakRanking = recruit.national_ranking
+    const location = recruit.location ?? 'the US'
+    const recruitStage =
+      body.recruitStage ?? recruit.recruit_stage ?? recruit.status ?? 'Identification'
 
-    // Fetch match results if any
-    const { data: matchResults } = await supabase
-      .from('match_results')
-      .select('*')
-      .eq('recruit_id', id)
-      .order('match_date', { ascending: false })
-      .limit(5)
+    const key = `${contactType}-${outreachFormat}`
 
-    const stage = recruit.recruit_stage ?? 'Identification'
+    const prompts: Record<string, string> = {
+      'initial-email': `Write a formal recruiting email from Howard Endelman, \
+Head Coach of Columbia University Men's Tennis, to ${recruitName} \
+(ranked #${peakRanking} nationally, from ${location}).
+- Formal tone, 3-4 paragraphs
+- Mention Columbia's Ivy League academics and NYC location
+- Reference their ranking and what Columbia's program can offer
+- End with a clear next step (campus visit, phone call)
+- Sign as: Howard Endelman, Head Coach, Columbia University Men's Tennis
+Return JSON: { "subject": "...", "body": "..." }`,
 
-    // Build stage-specific user prompt
-    let userPrompt: string
+      'initial-text': `Write a brief, warm text message from Coach Endelman \
+to ${recruitName} making first contact.
+- Casual, conversational, 3-5 sentences max
+- Mention you've been following their game
+- Invite them to learn more about Columbia tennis
+- No formal sign-off needed, just "- Coach Endelman"
+Return JSON: { "subject": null, "body": "..." }`,
 
-    if (stage === 'Identification' || stage === null) {
-      userPrompt = `Write a first contact email to ${recruit.name}, a ${
-        recruit.national_ranking ? `#${recruit.national_ranking}-ranked` : 'highly ranked'
-      } junior from ${recruit.location || 'the US'}. Keep it under 150 words. Express genuine interest, mention one specific thing about their game or ranking, and invite them to learn more about Columbia University Men's Tennis.`
-    } else if (stage === 'Contacted' || stage === 'Interested') {
-      const recentInteractions = interactions?.slice(0, 2)
-        .map(i => `${i.type} on ${i.date}: ${i.notes}`)
-        .join('; ') || 'no recent interactions on file'
+      'followup-email': `Write a formal follow-up recruiting email from Howard Endelman \
+to ${recruitName} who is currently at stage: ${recruitStage}.
+- Reference previous contact
+- Move the conversation forward based on their stage
+- 2-3 paragraphs, professional tone
+- Clear call to action
+- Sign as: Howard Endelman, Head Coach, Columbia University Men's Tennis
+Return JSON: { "subject": "...", "body": "..." }`,
 
-      userPrompt = `Write a follow-up email to ${recruit.name} who we've been in contact with at Columbia. Recent interactions: ${recentInteractions}. Keep it under 200 words. Move the relationship forward — suggest a campus visit or call.`
-    } else {
-      // Offer stage
-      userPrompt = `Write a formal offer communication to ${recruit.name}. Keep it under 250 words. Be direct about our interest, mention Columbia's recent success including an NCAA Sweet 16 appearance and multiple Ivy League titles, and create appropriate urgency.`
-    }
-
-    // Build context suffix with match results if available
-    let contextSuffix = ''
-    if (matchResults && matchResults.length > 0) {
-      const resultsSummary = matchResults
-        .map(m => `${m.opponent || 'opponent'} (${m.score || 'score N/A'})`)
-        .join(', ')
-      contextSuffix = `\n\nRecent match results for context: ${resultsSummary}`
+      'followup-text': `Write a brief follow-up text from Coach Endelman \
+to ${recruitName} (currently: ${recruitStage} stage).
+- Very casual, 2-3 sentences
+- Check in, move conversation forward
+- No formal sign-off
+Return JSON: { "subject": null, "body": "..." }`,
     }
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 600,
+      max_tokens: 1000,
       system:
-        'You are a college tennis coach\'s assistant. You are writing on behalf of Howard Endelman, Head Coach of Columbia University Men\'s Tennis. Sign all emails as: Howard Endelman, Head Coach, Columbia University Men\'s Tennis. Always refer to the program as "Columbia" specifically, never as "[University]". Write a concise, genuine recruiting email draft. No fluff, no excessive flattery. Sound like a real coach who has done their homework, not a form letter.',
-      messages: [
-        {
-          role: 'user',
-          content: `${userPrompt}${contextSuffix}\n\nReturn your response as JSON with this exact shape: { "subject": "...", "body": "..." }`,
-        },
-      ],
+        "You are Howard Endelman, Head Coach of Columbia University Men's Tennis. " +
+        "Write authentic, concise recruiting outreach. Never use placeholder text like [Name] or [University]. " +
+        "Always refer to the program as 'Columbia'.",
+      messages: [{ role: 'user', content: prompts[key] }],
     })
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : null
     if (!raw) throw new Error('Empty response from Claude')
 
-    // Parse JSON — strip any markdown fences if present
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
     if (!jsonMatch) throw new Error('Could not parse JSON from response')
-    const parsed = JSON.parse(jsonMatch[0]) as { subject: string; body: string }
+    const parsed = JSON.parse(jsonMatch[0]) as { subject: string | null; body: string }
 
-    return NextResponse.json({ success: true, subject: parsed.subject, body: parsed.body, stage })
+    return NextResponse.json({
+      success: true,
+      subject: parsed.subject,
+      body: parsed.body,
+      format: outreachFormat,
+    })
   } catch (error) {
     console.error('[outreach] error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to generate email draft' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Failed to generate draft' }, { status: 500 })
   }
 }
