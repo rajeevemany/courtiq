@@ -145,7 +145,7 @@ export async function GET() {
   if (!previousDate) {
     const { data: yoyOnly } = await supabase
       .from('junior_profiles')
-      .select('id, name, state, committed_year, committed_school, ranking_yr2, ranking_yr3, peak_ranking, tennisrecruiting_id')
+      .select('id, name, state, committed_year, ranking_yr2, ranking_yr3, peak_ranking, tennisrecruiting_id')
       .not('ranking_yr2', 'is', null)
       .not('ranking_yr3', 'is', null)
       .limit(2500)
@@ -153,10 +153,7 @@ export async function GET() {
     const earlySophToJunior: SophToJuniorPlayer[] = (yoyOnly || [])
       .filter(p =>
         Number(p.ranking_yr2) > 0 &&
-        Number(p.ranking_yr3) > 0 &&
-        (p.committed_year === null || Number(p.committed_year) >= 2026) &&
-        (p.committed_school === null || p.committed_school === '') &&
-        !committedIds.has(p.tennisrecruiting_id)
+        Number(p.ranking_yr3) > 0
       )
       .map(p => ({
         name: p.name,
@@ -224,7 +221,7 @@ export async function GET() {
   // ── Soph→Junior year-over-year improvement ──────────────────────────────
   const { data: yearOverYear } = await supabase
     .from('junior_profiles')
-    .select('id, name, state, committed_year, committed_school, ranking_yr2, ranking_yr3, peak_ranking, tennisrecruiting_id')
+    .select('id, name, state, committed_year, ranking_yr2, ranking_yr3, peak_ranking, tennisrecruiting_id')
     .not('ranking_yr2', 'is', null)
     .not('ranking_yr3', 'is', null)
     .limit(2500)

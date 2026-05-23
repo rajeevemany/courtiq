@@ -393,12 +393,13 @@ function YoYSection({
       <div className="px-5 py-4 border-b border-white/10">
         <div className="flex items-center gap-2">
           <span className="text-amber-400">📈</span>
-          <h2 className="font-semibold">Year-Over-Year Movers</h2>
+          <h2 className="font-semibold">Year-Over-Year Improvers</h2>
+          <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs px-2 py-0.5 rounded-full">Historical</span>
           <span className="ml-auto text-xs font-mono text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
             {filtered.length}
           </span>
         </div>
-        <p className="text-xs text-slate-400 mt-0.5">Current uncommitted prospects who improved {threshold}+ spots from sophomore to junior year</p>
+        <p className="text-xs text-slate-400 mt-0.5">Players who made the biggest jump from sophomore to junior year — historical pattern of breakout trajectories</p>
         <div className="flex items-center gap-1.5 mt-3">
           {[10, 20, 30].map(t => (
             <button
