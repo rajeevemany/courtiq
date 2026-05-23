@@ -150,16 +150,13 @@ export async function GET() {
       .not('ranking_yr3', 'is', null)
       .limit(2500)
 
-    const earlyAfterCommit = (yoyOnly || [])
+    const earlySophToJunior: SophToJuniorPlayer[] = (yoyOnly || [])
       .filter(p =>
-        p.ranking_yr2 != null &&
-        p.ranking_yr3 != null &&
         Number(p.ranking_yr2) > 0 &&
         Number(p.ranking_yr3) > 0 &&
+        Number(p.committed_year) >= 2025 &&
         !committedIds.has(p.tennisrecruiting_id)
       )
-
-    const earlySophToJunior: SophToJuniorPlayer[] = earlyAfterCommit
       .map(p => ({
         name: p.name,
         state: p.state,
@@ -172,7 +169,7 @@ export async function GET() {
       }))
       .filter(p => p.improvement >= 10)
       .sort((a, b) => b.improvement - a.improvement)
-      .slice(0, 20)
+      .slice(0, 50)
 
     return NextResponse.json({
       rising: [],
@@ -231,16 +228,13 @@ export async function GET() {
     .not('ranking_yr3', 'is', null)
     .limit(2500)
 
-  const afterCommitFilter = (yearOverYear || [])
+  const sophToJunior: SophToJuniorPlayer[] = (yearOverYear || [])
     .filter(p =>
-      p.ranking_yr2 != null &&
-      p.ranking_yr3 != null &&
       Number(p.ranking_yr2) > 0 &&
       Number(p.ranking_yr3) > 0 &&
+      Number(p.committed_year) >= 2025 &&
       !committedIds.has(p.tennisrecruiting_id)
     )
-
-  const sophToJunior: SophToJuniorPlayer[] = afterCommitFilter
     .map(p => ({
       name: p.name,
       state: p.state,
@@ -253,7 +247,7 @@ export async function GET() {
     }))
     .filter(p => p.improvement >= 10)
     .sort((a, b) => b.improvement - a.improvement)
-    .slice(0, 20)
+    .slice(0, 50)
 
   return NextResponse.json({
     rising,

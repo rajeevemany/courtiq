@@ -398,7 +398,7 @@ function YoYSection({
             {filtered.length}
           </span>
         </div>
-        <p className="text-xs text-slate-400 mt-0.5">Players who improved {threshold}+ spots from sophomore to junior year</p>
+        <p className="text-xs text-slate-400 mt-0.5">Current uncommitted prospects who improved {threshold}+ spots from sophomore to junior year</p>
         <div className="flex items-center gap-1.5 mt-3">
           {[10, 20, 30].map(t => (
             <button
