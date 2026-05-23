@@ -19,6 +19,9 @@ interface BandPlayer {
   name: string
   school: string
   peak_ranking: number | null
+  ranking_yr2: number | null
+  ranking_yr3: number | null
+  ranking_yr4: number | null
   career_singles_wins: number
   career_singles_losses: number
   peak_ita_ranking: number | null
@@ -345,10 +348,12 @@ export default function ProspectDiscoveryPage() {
                       ) : (
                         <div>
                           {/* Table header */}
-                          <div className="grid grid-cols-[2fr_1.5fr_80px_110px_80px_3fr_24px] gap-x-4 px-5 py-2 text-xs uppercase tracking-widest text-slate-500 font-medium border-b border-white/5">
+                          <div className="grid grid-cols-[2fr_1.5fr_70px_70px_70px_110px_70px_3fr_24px] gap-x-4 px-5 py-2 text-xs uppercase tracking-widest text-slate-500 font-medium border-b border-white/5">
                             <span>Name</span>
                             <span>School</span>
-                            <span>Jr Rank</span>
+                            <span title="Sophomore year TR ranking">Soph</span>
+                            <span title="Junior year TR ranking">Jr</span>
+                            <span title="Senior year TR ranking">Sr</span>
                             <span>Career</span>
                             <span title="Singles ranking where available">Peak ITA *</span>
                             <span>Summary</span>
@@ -362,12 +367,18 @@ export default function ProspectDiscoveryPage() {
                               <div key={i} className={i !== visiblePlayers.length - 1 ? 'border-b border-white/5' : ''}>
                                 <div
                                   onClick={() => hasSummary && setExpandedPlayer(isExpanded ? null : playerKey)}
-                                  className={`grid grid-cols-[2fr_1.5fr_80px_110px_80px_3fr_24px] gap-x-4 px-5 py-3 items-center text-sm transition ${hasSummary ? 'cursor-pointer hover:bg-white/5' : 'hover:bg-white/5'}`}
+                                  className={`grid grid-cols-[2fr_1.5fr_70px_70px_70px_110px_70px_3fr_24px] gap-x-4 px-5 py-3 items-center text-sm transition ${hasSummary ? 'cursor-pointer hover:bg-white/5' : 'hover:bg-white/5'}`}
                                 >
                                   <span className="font-medium text-white">{p.name}</span>
                                   <span className="text-slate-300 truncate">{p.school ?? '—'}</span>
-                                  <span className="text-slate-300">
-                                    {p.peak_ranking != null ? `#${p.peak_ranking}` : '—'}
+                                  <span className="text-slate-400">
+                                    {p.ranking_yr2 != null ? `#${p.ranking_yr2}` : '—'}
+                                  </span>
+                                  <span className="text-slate-400">
+                                    {p.ranking_yr3 != null ? `#${p.ranking_yr3}` : '—'}
+                                  </span>
+                                  <span className="text-slate-400">
+                                    {p.ranking_yr4 != null ? `#${p.ranking_yr4}` : '—'}
                                   </span>
                                   <span className="text-slate-300">
                                     <span className="text-green-400">{p.career_singles_wins}</span>

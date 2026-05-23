@@ -34,7 +34,7 @@ export async function GET() {
     // ── a. RANKING-TO-OUTCOME MODEL ──────────────────────────────────────────
     const { data: columbiaJuniors, error: err1 } = await supabase
       .from('junior_profiles')
-      .select('id, name, rating, peak_ranking')
+      .select('id, name, rating, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4')
       .eq('committed_school', 'Columbia')
       .not('peak_ranking', 'is', null)
 
@@ -60,6 +60,7 @@ export async function GET() {
 
     type BandPlayer = {
       name: string; school: string; peak_ranking: number | null
+      ranking_yr2: number | null; ranking_yr3: number | null; ranking_yr4: number | null
       career_singles_wins: number; career_singles_losses: number
       peak_ita_ranking: number | null; career_summary: string | null
     }
@@ -84,13 +85,18 @@ export async function GET() {
 
     const { data: careerJuniors, error: err2c } = await supabase
       .from('junior_profiles')
-      .select('id, peak_ranking, name')
+      .select('id, peak_ranking, name, ranking_yr2, ranking_yr3, ranking_yr4')
       .in('id', careerJuniorIds.length ? careerJuniorIds : ['00000000-0000-0000-0000-000000000000'])
 
     if (err2c) throw err2c
 
-    const juniorRankMap = new Map((careerJuniors || []).map((j) => [j.id, j.peak_ranking]))
-    const juniorNameMap = new Map((careerJuniors || []).map((j) => [j.id, j.name]))
+    const juniorDataMap = new Map((careerJuniors || []).map((j) => [j.id, {
+      peak_ranking: j.peak_ranking,
+      name: j.name,
+      ranking_yr2: j.ranking_yr2 ?? null,
+      ranking_yr3: j.ranking_yr3 ?? null,
+      ranking_yr4: j.ranking_yr4 ?? null,
+    }]))
 
     const allBandMap: Record<string, BandData> = Object.fromEntries(
       BAND_ORDER.map((b) => [b, { wins: [], losses: [] }])
@@ -100,15 +106,18 @@ export async function GET() {
     )
 
     for (const career of allCareers || []) {
-      const peak_ranking = juniorRankMap.get(career.junior_profile_id)
-      if (peak_ranking == null) continue
-      const band = getRankingBand(peak_ranking)
+      const jd = juniorDataMap.get(career.junior_profile_id)
+      if (jd?.peak_ranking == null) continue
+      const band = getRankingBand(jd.peak_ranking)
       allBandMap[band].wins.push(career.career_singles_wins!)
       allBandMap[band].losses.push(career.career_singles_losses ?? 0)
       allBandPlayers[band].push({
-        name: juniorNameMap.get(career.junior_profile_id) ?? 'Unknown',
+        name: jd.name ?? 'Unknown',
         school: career.school,
-        peak_ranking,
+        peak_ranking: jd.peak_ranking,
+        ranking_yr2: jd.ranking_yr2,
+        ranking_yr3: jd.ranking_yr3,
+        ranking_yr4: jd.ranking_yr4,
         career_singles_wins: career.career_singles_wins!,
         career_singles_losses: career.career_singles_losses ?? 0,
         peak_ita_ranking: career.peak_ita_ranking ?? null,
@@ -340,9 +349,6 @@ interface EligibleProspect {
     })()
     const threshold = top15AllAvgWins * 0.75
 
-    // Build comparable lookup from already-fetched allCareers + careerJuniors
-    // career → peak_ranking already in juniorRankMap
-
     type CompPlayer = {
       name: string; school: string; peak_ranking: number
       career_singles_wins: number; career_singles_losses: number
@@ -367,13 +373,14 @@ interface EligibleProspect {
       type RankEntry = { wins: number; losses: number; name: string; school: string; peak_ranking: number }
       const rankToPlayers = new Map<number, RankEntry[]>()
       for (const career of allCareers || []) {
-        const pr = juniorRankMap.get(career.junior_profile_id)
-        if (pr == null) continue
+        const jd = juniorDataMap.get(career.junior_profile_id)
+        if (jd?.peak_ranking == null) continue
+        const pr = jd.peak_ranking
         if (!rankToPlayers.has(pr)) rankToPlayers.set(pr, [])
         rankToPlayers.get(pr)!.push({
           wins: career.career_singles_wins!,
           losses: career.career_singles_losses ?? 0,
-          name: juniorNameMap.get(career.junior_profile_id) ?? 'Unknown',
+          name: jd.name ?? 'Unknown',
           school: career.school,
           peak_ranking: pr,
         })
