@@ -46,7 +46,7 @@ export default function AIBriefButton({ recruitId, existingBrief, existingBriefD
         <div className="flex items-center gap-2">
           <span className="text-blue-400 text-sm">✦</span>
           <h2 className="font-semibold text-sm uppercase tracking-wider text-blue-400">
-            AI Brief
+            🤖 AI Scout Brief
           </h2>
         </div>
         <button
@@ -57,6 +57,10 @@ export default function AIBriefButton({ recruitId, existingBrief, existingBriefD
           {loading ? 'Generating...' : brief ? 'Regenerate' : 'Generate Brief'}
         </button>
       </div>
+
+      <p className="text-xs text-slate-500 italic mb-3">
+        Synthesizes uploaded documents, match results, and scouting notes into a recruit intelligence brief
+      </p>
 
       {error && (
         <p className="text-red-400 text-sm">{error}</p>

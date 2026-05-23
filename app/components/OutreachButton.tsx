@@ -71,7 +71,7 @@ export default function OutreachButton({ recruitId, recruitStage }: Props) {
               />
             </svg>
             <h2 className="font-semibold text-sm uppercase tracking-wider text-emerald-400">
-              Outreach
+              📧 Outreach Email
             </h2>
           </div>
           <button
@@ -83,11 +83,14 @@ export default function OutreachButton({ recruitId, recruitStage }: Props) {
           </button>
         </div>
 
+        <p className="text-xs text-slate-500 italic mb-3">
+          Drafts a stage-appropriate email from Howard Endelman based on the recruit&apos;s current pipeline stage
+        </p>
+
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         {!error && !loading && (
           <p className="text-sm text-slate-400">
-            Generate a stage-appropriate email draft for this recruit.{' '}
             <span className="text-slate-500">Stage: {stageLabel}</span>
           </p>
         )}

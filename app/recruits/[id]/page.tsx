@@ -7,9 +7,9 @@ import DocumentUpload from '@/app/components/DocumentUpload'
 import EditRecruitForm from '@/app/components/EditRecruitForm'
 import FitScoreCalculator from '@/app/components/FitScoreCalculator'
 import MatchResultsSection from '@/app/components/MatchResultsSection'
-import ScoutReportSection from '@/app/components/ScoutReportSection'
 import ComparablePlayersCard from '@/app/components/ComparablePlayersCard'
 import OutreachButton from '@/app/components/OutreachButton'
+import CoachNotesEditor from '@/app/components/CoachNotesEditor'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -114,15 +114,26 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {/* NOTES */}
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4 text-sm uppercase tracking-wider text-slate-400">
-                Scouting Notes
-              </h2>
-              <p className="text-slate-300 leading-relaxed">
-                {recruit.notes || 'No notes added yet.'}
-              </p>
-            </div>
+            <div className="h-px bg-white/10" />
+
+            {/* COACH NOTES */}
+            <CoachNotesEditor recruitId={recruit.id} initialNotes={recruit.notes} />
+
+            <div className="h-px bg-white/10" />
+
+            {/* AI SCOUT BRIEF */}
+            <AIBriefButton
+              recruitId={recruit.id}
+              existingBrief={recruit.ai_brief}
+              existingBriefDate={recruit.ai_brief_generated_at}
+            />
+
+            <div className="h-px bg-white/10" />
+
+            {/* OUTREACH EMAIL */}
+            <OutreachButton recruitId={recruit.id} recruitStage={recruit.status} />
+
+            <div className="h-px bg-white/10" />
 
             {/* INTERACTION HISTORY */}
             <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -177,22 +188,20 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
               )}
             </div>
 
+            <div className="h-px bg-white/10" />
+
             {/* DOCUMENTS */}
             <DocumentUpload recruitId={recruit.id} />
 
+            <div className="h-px bg-white/10" />
+
             {/* MATCH RESULTS */}
             <MatchResultsSection recruitId={recruit.id} recruitRanking={recruit.national_ranking} />
-
-            {/* SCOUT REPORT & OUTREACH */}
-            <ScoutReportSection recruitId={recruit.id} recruitName={recruit.name} />
 
           </div>
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-5">
-
-            {/* OUTREACH */}
-            <OutreachButton recruitId={recruit.id} recruitStage={recruit.status} />
 
             {/* FIT SCORE CALCULATOR */}
             <FitScoreCalculator
@@ -250,13 +259,6 @@ export default async function RecruitProfile({ params }: { params: Promise<{ id:
 
             {/* COMPARABLE COLUMBIA OUTCOMES */}
             <ComparablePlayersCard recruitRanking={recruit.national_ranking} />
-
-            {/* AI BRIEF */}
-            <AIBriefButton
-              recruitId={recruit.id}
-              existingBrief={recruit.ai_brief}
-              existingBriefDate={recruit.ai_brief_generated_at}
-            />
 
           </div>
         </div>
