@@ -51,12 +51,24 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
     if (!currentTournament) continue
 
     // Must have a round cell as col 0
-    const roundMatch = /<td[^>]*class="[^"]*\bc\b[^"]*"[^>]*>\s*([A-Z0-9]{1,5})\s*<\/td>/i.exec(row)
+    const roundMatch = /<td[^>]*class="[^"]*\bc\b[^"]*"[^>]*>\s*([A-Z0-9]{1,6})\s*<\/td>/i.exec(row)
     if (!roundMatch) continue
 
     const round = roundMatch[1].trim().toUpperCase()
-    const validRounds = new Set(['R1','R2','R3','R4','R5','R64','R32','R16','QF','SF','F','W','RR'])
+    const validRounds = new Set([
+      'R1','R2','R3','R4','R5','R6',
+      'R64','R32','R16','R8','R128',
+      '128','64','32','16','8',
+      'QF','Q','SF','S','F','W',
+      'RR','Q1','Q2','Q3',
+    ])
     if (!validRounds.has(round)) continue
+
+    const roundNormalized: Record<string, string> = {
+      '128': 'R128', '64': 'R64', '32': 'R32', '16': 'R16',
+      '8': 'QF', 'Q': 'QF', 'S': 'SF',
+    }
+    const normalizedRound = roundNormalized[round] ?? round
 
     // Extract all <td> cells from this row
     const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi
@@ -80,21 +92,18 @@ function parseTennisRecruitingHTML(html: string): ParsedMatch[] {
     const activeCell = (winAnchor ? cells[1] : cells[2])
     const anchorText = (winAnchor ?? lossAnchor)![1].trim()
 
-    // Opponent name is the anchor text directly (no ranking inside the tag)
-    console.log('Opponent anchor text:', anchorText)
     const opponentName = anchorText
 
     // Ranking appears after </a> in the cell: <a href="...">Name</a> (68)
     const rankingInCell = /<\/a>[^(]*\((\d+)\)/.exec(activeCell)
     const opponentRanking = rankingInCell ? parseInt(rankingInCell[1], 10) : undefined
-    console.log('Opponent ranking from cell:', opponentRanking)
 
     // Score is in col 3; strip any residual tags
     const score = cells[3].replace(/<[^>]+>/g, '').trim()
 
     matches.push({
       tournament_name: currentTournament,
-      round,
+      round: normalizedRound,
       opponent_name: opponentName,
       opponent_ranking: opponentRanking,
       score,
