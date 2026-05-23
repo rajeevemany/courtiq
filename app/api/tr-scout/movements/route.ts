@@ -37,6 +37,17 @@ export interface TRCommitment {
   recruit_id: string | null
 }
 
+export interface SophToJuniorPlayer {
+  name: string
+  state: string | null
+  grad_year: number | null
+  tennisrecruiting_id: string | null
+  soph_rank: number
+  junior_rank: number
+  improvement: number
+  peak_ranking: number | null
+}
+
 export interface MovementsResponse {
   rising: TRMover[]
   entered_top30: TRMover[]
@@ -44,6 +55,7 @@ export interface MovementsResponse {
   top30_uncommitted: TRSnapshot[]
   newly_committed: TRCommitment[]
   snapshot_dates: { current: string | null; previous: string | null }
+  soph_to_junior: SophToJuniorPlayer[]
 }
 
 async function getNewlyCommitted(recruits: { id: string; name: string }[]): Promise<TRCommitment[]> {
@@ -113,6 +125,7 @@ export async function GET() {
       top30_uncommitted: [],
       newly_committed: await getNewlyCommitted(recruitList),
       snapshot_dates: { current: null, previous: null },
+      soph_to_junior: [],
     } satisfies MovementsResponse)
   }
 
@@ -137,6 +150,7 @@ export async function GET() {
       top30_uncommitted,
       newly_committed: await getNewlyCommitted(recruitList),
       snapshot_dates: { current: currentDate, previous: null },
+      soph_to_junior: [],
     } satisfies MovementsResponse)
   }
 
@@ -178,6 +192,31 @@ export async function GET() {
   // Sort rising by rank_change descending
   rising.sort((a, b) => b.rank_change - a.rank_change)
 
+  // ── Soph→Junior year-over-year improvement ──────────────────────────────
+  const { data: yearOverYear } = await supabase
+    .from('junior_profiles')
+    .select('id, name, state, grad_year, ranking_yr2, ranking_yr3, peak_ranking, tennisrecruiting_id')
+    .not('ranking_yr2', 'is', null)
+    .not('ranking_yr3', 'is', null)
+    .gt('ranking_yr2', 0)
+    .gt('ranking_yr3', 0)
+
+  const sophToJunior: SophToJuniorPlayer[] = (yearOverYear || [])
+    .filter(p => !committedIds.has(p.tennisrecruiting_id))
+    .map(p => ({
+      name: p.name,
+      state: p.state,
+      grad_year: p.grad_year,
+      tennisrecruiting_id: p.tennisrecruiting_id,
+      soph_rank: p.ranking_yr2 as number,
+      junior_rank: p.ranking_yr3 as number,
+      improvement: (p.ranking_yr2 as number) - (p.ranking_yr3 as number),
+      peak_ranking: p.peak_ranking,
+    }))
+    .filter(p => p.improvement >= 10)
+    .sort((a, b) => b.improvement - a.improvement)
+    .slice(0, 20)
+
   return NextResponse.json({
     rising,
     entered_top30,
@@ -185,5 +224,6 @@ export async function GET() {
     top30_uncommitted,
     newly_committed: await getNewlyCommitted(recruitList),
     snapshot_dates: { current: currentDate, previous: previousDate },
+    soph_to_junior: sophToJunior,
   } satisfies MovementsResponse)
 }

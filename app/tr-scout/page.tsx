@@ -29,6 +29,17 @@ interface TRCommitment {
   recruit_id?: string | null
 }
 
+interface SophToJuniorPlayer {
+  name: string
+  state: string | null
+  grad_year: number | null
+  tennisrecruiting_id: string | null
+  soph_rank: number
+  junior_rank: number
+  improvement: number
+  peak_ranking: number | null
+}
+
 interface MovementsData {
   rising: TRPlayer[]
   entered_top30: TRPlayer[]
@@ -36,6 +47,7 @@ interface MovementsData {
   top30_uncommitted: TRPlayer[]
   newly_committed: TRCommitment[]
   snapshot_dates: { current: string | null; previous: string | null }
+  soph_to_junior?: SophToJuniorPlayer[]
 }
 
 function RankBadge({ ranking }: { ranking: number }) {
@@ -318,8 +330,110 @@ function CommitmentsSection({ players }: { players: TRCommitment[] }) {
   )
 }
 
+function YoYCard({ player }: { player: SophToJuniorPlayer }) {
+  const initials = player.name.split(' ').map(n => n[0]).join('').slice(0, 2)
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
+      <div className="w-8 h-8 rounded-full bg-amber-900/40 border border-amber-500/30 flex items-center justify-center text-xs font-bold text-amber-300 flex-shrink-0">
+        {initials}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          {player.tennisrecruiting_id ? (
+            <a
+              href={`https://www.tennisrecruiting.net/player.asp?id=${player.tennisrecruiting_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-sm hover:text-amber-300 transition-colors"
+            >
+              {player.name}
+            </a>
+          ) : (
+            <span className="font-medium text-sm">{player.name}</span>
+          )}
+          <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded">
+            ↑ +{player.improvement}
+          </span>
+          {player.peak_ranking != null && (
+            <span className="inline-flex items-center text-xs text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+              peak #{player.peak_ranking}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          {player.state && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.state}</span>
+          )}
+          {player.grad_year && (
+            <span className="text-xs text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{player.grad_year}</span>
+          )}
+          <span className="text-xs text-slate-500">
+            Soph <span className="text-slate-400">#{player.soph_rank}</span>
+            <span className="mx-1 text-slate-600">→</span>
+            Jr <span className="text-slate-400">#{player.junior_rank}</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function YoYSection({
+  players,
+  threshold,
+  setThreshold,
+}: {
+  players: SophToJuniorPlayer[]
+  threshold: number
+  setThreshold: (t: number) => void
+}) {
+  const filtered = players.filter(p => p.improvement >= threshold)
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden xl:col-span-2">
+      <div className="px-5 py-4 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400">📈</span>
+          <h2 className="font-semibold">Year-Over-Year Movers</h2>
+          <span className="ml-auto text-xs font-mono text-slate-500 bg-white/5 px-2 py-0.5 rounded-full">
+            {filtered.length}
+          </span>
+        </div>
+        <p className="text-xs text-slate-400 mt-0.5">Players who improved {threshold}+ spots from sophomore to junior year</p>
+        <div className="flex items-center gap-1.5 mt-3">
+          {[10, 20, 30].map(t => (
+            <button
+              key={t}
+              onClick={() => setThreshold(t)}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                threshold === t
+                  ? 'bg-white/15 text-white border-white/20'
+                  : 'bg-white/5 text-slate-500 border-white/10 hover:text-slate-300'
+              }`}
+            >
+              +{t}
+            </button>
+          ))}
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <div className="px-5 py-6 text-center text-slate-500 text-sm">
+          No year-over-year data yet — rankings populate as players are captured
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 divide-y xl:divide-y-0 xl:divide-x divide-white/5">
+          {filtered.map((p, i) => (
+            <YoYCard key={`${p.name}-${i}`} player={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TRScoutPage() {
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [risingThreshold, setRisingThreshold] = useState(5)
+  const [yoyThreshold, setYoyThreshold] = useState(10)
 
   const [movements, setMovements] = useState<MovementsData | null>(null)
   const [loadingMovements, setLoadingMovements] = useState(true)
@@ -445,14 +559,42 @@ export default function TRScoutPage() {
         {/* Sections grid */}
         {!loadingMovements && movements && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-            <Section
-              title="Rising Fast"
-              icon="↑"
-              accentColor="green"
-              description="Improved 5+ spots since last snapshot"
-              players={movements.rising}
-              emptyMsg="No significant movers — fetch new rankings to compare."
+            <YoYSection
+              players={movements.soph_to_junior ?? []}
+              threshold={yoyThreshold}
+              setThreshold={setYoyThreshold}
             />
+
+            {(() => {
+              const filteredRising = movements.rising.filter(p => (p.rank_change ?? 0) >= risingThreshold)
+              return (
+                <Section
+                  title="Rising Fast"
+                  icon="↑"
+                  accentColor="green"
+                  description={`Improved ${risingThreshold}+ spots since last snapshot`}
+                  players={filteredRising}
+                  emptyMsg="No significant movers — fetch new rankings to compare."
+                  headerExtra={
+                    <div className="flex items-center gap-1.5 mt-3">
+                      {[5, 10, 20, 30].map(t => (
+                        <button
+                          key={t}
+                          onClick={() => setRisingThreshold(t)}
+                          className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                            risingThreshold === t
+                              ? 'bg-white/15 text-white border-white/20'
+                              : 'bg-white/5 text-slate-500 border-white/10 hover:text-slate-300'
+                          }`}
+                        >
+                          +{t}
+                        </button>
+                      ))}
+                    </div>
+                  }
+                />
+              )
+            })()}
 
             <Section
               title="Entered Top 30"
