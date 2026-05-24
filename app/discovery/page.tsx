@@ -174,6 +174,7 @@ function ITFCard({ player }: { player: ITFPlayer }) {
           fit_score: 50,
           competing_schools: [],
           notes: `ITF Rank #${player.ranking}${player.birth_year ? ` · Born ${player.birth_year}` : ''}. Imported from ITF junior rankings.`,
+          itf_player_id: player.itf_player_id ?? '',
         }),
       })
       setStatus(res.ok ? 'added' : 'error')
@@ -247,6 +248,9 @@ function DomesticCard({ player }: { player: DomesticPlayer }) {
           fit_score: 50,
           competing_schools: [],
           notes: `Domestic Rank #${player.domestic_rank}${player.itf_ranking ? ` · ITF #${player.itf_ranking}` : ''}. Hidden gem from domestic scout.`,
+          itf_player_id: player.itf_player_id ?? '',
+          country_code: player.country_code ?? '',
+          domestic_rank: player.domestic_rank ?? null,
         }),
       })
       setStatus(res.ok ? 'added' : 'error')

@@ -145,6 +145,7 @@ export default function ITFImportPage() {
           fit_score: 50,
           competing_schools: [],
           notes: `ITF Rank #${player.rank} · Born ${player.birthYear}. Imported from ITF junior rankings.`,
+          itf_player_id: player.playerId ?? '',
         }),
       })
       if (!res.ok) throw new Error('Failed')

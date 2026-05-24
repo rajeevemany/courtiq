@@ -103,6 +103,7 @@ function PlayerCard({
           status: 'Active',
           priority: player.ranking <= 30 ? 'High' : player.ranking <= 60 ? 'Medium' : 'Watch',
           notes: `TR Rating: ${player.rating ?? 'N/A'}. Added via TR Scout.`,
+          tennisrecruiting_id: player.tennisrecruiting_id ?? '',
         }),
       })
       if (res.ok) {

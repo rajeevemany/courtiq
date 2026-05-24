@@ -425,6 +425,9 @@ export default function DomesticScoutPage() {
                             status: 'Prospect',
                             priority: 'Low',
                             plays: 'Right',
+                            itf_player_id: p.itf_player_id ?? '',
+                            country_code: p.country_code ?? '',
+                            domestic_rank: p.domestic_rank ?? null,
                           }),
                         })
                         if (res.ok) {
