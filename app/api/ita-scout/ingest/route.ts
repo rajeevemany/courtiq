@@ -12,10 +12,29 @@ interface RankingRow {
   school: string | null
 }
 
+const cleanName = (raw: string) => {
+  return raw
+    .replace(/[\n\r\t]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map(word => {
+      if (word === word.toUpperCase() && word.length > 1) {
+        return word.charAt(0) + word.slice(1).toLowerCase()
+      }
+      return word
+    })
+    .join(' ')
+}
+
+const cleanSchool = (s: string) => s?.replace(/\s*\([MF]\)\s*$/, '').trim()
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { rankings, season, match_format, gender, date, source_url } = body
+    const { rankings, season, match_format, gender, date } = body
+
+    console.log('[ita-ingest] first 3 rankings:', JSON.stringify(body.rankings?.slice(0, 3)))
 
     if (!Array.isArray(rankings) || rankings.length === 0) {
       return NextResponse.json({ success: false, error: 'No rankings provided' }, { status: 400 })
@@ -25,8 +44,8 @@ export async function POST(request: Request) {
     }
 
     const rows = (rankings as RankingRow[]).map(r => ({
-      player_name:  String(r.name).trim(),
-      school:       r.school ? String(r.school).trim() : null,
+      player_name:  cleanName(String(r.name)),
+      school:       r.school ? cleanSchool(String(r.school)) : null,
       ita_rank:     Number(r.rank),
       season:       String(season),
       match_format: String(match_format || 'SINGLES').toUpperCase(),
