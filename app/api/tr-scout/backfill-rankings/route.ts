@@ -10,11 +10,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     console.log('[backfill] body:', JSON.stringify(body))
-    const {
-      tennisrecruiting_id,
-      ranking_yr1, ranking_yr2, ranking_yr3, ranking_yr4,
-      ranking_yr1_year, ranking_yr2_year, ranking_yr3_year, ranking_yr4_year,
-    } = body
+    const { tennisrecruiting_id, ranking_yr1, ranking_yr2, ranking_yr3, ranking_yr4 } = body
 
     if (!tennisrecruiting_id) {
       return NextResponse.json({ success: false, error: 'tennisrecruiting_id required' }, { status: 400 })
@@ -27,11 +23,6 @@ export async function POST(request: Request) {
     if (ranking_yr2 != null) { updates.ranking_yr2 = Number(ranking_yr2); updated.push('ranking_yr2') }
     if (ranking_yr3 != null) { updates.ranking_yr3 = Number(ranking_yr3); updated.push('ranking_yr3') }
     if (ranking_yr4 != null) { updates.ranking_yr4 = Number(ranking_yr4); updated.push('ranking_yr4') }
-
-    if (ranking_yr1_year != null) updates.ranking_yr1_year = Number(ranking_yr1_year)
-    if (ranking_yr2_year != null) updates.ranking_yr2_year = Number(ranking_yr2_year)
-    if (ranking_yr3_year != null) updates.ranking_yr3_year = Number(ranking_yr3_year)
-    if (ranking_yr4_year != null) updates.ranking_yr4_year = Number(ranking_yr4_year)
 
     if (updated.length === 0) {
       return NextResponse.json({ success: false, error: 'No rankings provided' }, { status: 400 })
