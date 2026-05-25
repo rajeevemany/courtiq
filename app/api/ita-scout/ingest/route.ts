@@ -32,7 +32,6 @@ export async function POST(request: Request) {
       match_format: String(match_format || 'SINGLES').toUpperCase(),
       gender:       String(gender || 'M').toUpperCase(),
       snapshot_date: date || new Date().toISOString().split('T')[0],
-      source_url:   source_url || null,
     }))
 
     const { error } = await supabase
