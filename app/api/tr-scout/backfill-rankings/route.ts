@@ -9,6 +9,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    console.log('[backfill] body:', JSON.stringify(body))
     const {
       tennisrecruiting_id,
       ranking_yr1, ranking_yr2, ranking_yr3, ranking_yr4,
@@ -41,6 +42,8 @@ export async function POST(request: Request) {
       .update(updates)
       .eq('tennisrecruiting_id', String(tennisrecruiting_id))
       .select('tennisrecruiting_id')
+
+    console.log('[backfill] update result:', data, error)
 
     if (error) throw error
 
