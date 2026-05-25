@@ -14,11 +14,21 @@ interface Player {
   wins: number
   losses: number
   college: string | null
-  honors: string | null
+  honors: unknown
   career_summary: string | null
 }
 
 type SortKey = 'ita_rank' | 'peak_tr_ranking' | 'senior_rank' | 'wins'
+
+function getFirstHonor(honors: unknown): string {
+  if (!honors) return '—'
+  if (typeof honors === 'string') return honors.split('\n')[0] || '—'
+  if (typeof honors === 'object') {
+    const h = honors as Record<string, string[]>
+    return h.national?.[0] || h.conference?.[0] || h.regional?.[0] || '—'
+  }
+  return '—'
+}
 
 function rankColor(rank: number | null): string {
   if (rank == null) return 'text-slate-500'
@@ -260,8 +270,8 @@ export default function ITAPipelinePage() {
                     <div className="text-xs text-slate-400 font-mono whitespace-nowrap">
                       {p.wins != null && p.losses != null ? `${p.wins}W-${p.losses}L` : '—'}
                     </div>
-                    <div className="text-xs text-slate-400 truncate" title={p.honors ?? ''}>
-                      {p.honors ? p.honors.split('\n')[0].substring(0, 40) : '—'}
+                    <div className="text-xs text-slate-400 truncate" title={getFirstHonor(p.honors)}>
+                      {getFirstHonor(p.honors)}
                     </div>
                   </div>
 
