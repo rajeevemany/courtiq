@@ -952,29 +952,45 @@ function extractPlayerData() {
     document.getElementById('courtiq-ranking-history-trigger').addEventListener('click', async () => {
       const trigger = document.getElementById('courtiq-ranking-history-trigger')
 
-      const yearMap = {
-        'Freshman': 'ranking_yr1', 'Fr.': 'ranking_yr1', 'FR': 'ranking_yr1',
-        'Sophomore': 'ranking_yr2', 'So.': 'ranking_yr2', 'SO': 'ranking_yr2',
-        'Junior': 'ranking_yr3', 'Jr.': 'ranking_yr3', 'JR': 'ranking_yr3',
-        'Senior': 'ranking_yr4', 'Sr.': 'ranking_yr4', 'SR': 'ranking_yr4',
-      }
-      const rankings = { ranking_yr1: null, ranking_yr2: null, ranking_yr3: null, ranking_yr4: null }
+      // Find the table with "HIGHEST RANKINGS" header, extract "YYYY Recruiting:" rows
+      const byYear = {}
+      for (const table of document.querySelectorAll('table')) {
+        let isRankingsTable = false
+        for (const th of table.querySelectorAll('th')) {
+          if (th.innerText.includes('HIGHEST RANKINGS')) { isRankingsTable = true; break }
+        }
+        if (!isRankingsTable) continue
 
-      const cells = Array.from(document.querySelectorAll('td, th'))
-      for (let i = 0; i < cells.length; i++) {
-        const text = cells[i].innerText.trim()
-        const key = yearMap[text]
-        if (!key || rankings[key] !== null) continue
-        const next = cells[i + 1]
-        if (!next) continue
-        const num = parseInt(next.innerText.trim())
-        if (!isNaN(num) && num >= 1 && num <= 1500) rankings[key] = num
+        for (const row of table.querySelectorAll('tr')) {
+          const cells = Array.from(row.querySelectorAll('td'))
+          for (let i = 0; i < cells.length; i++) {
+            const yearMatch = cells[i].innerText.trim().match(/^(\d{4})\s+Recruiting:?$/i)
+            if (!yearMatch) continue
+            const next = cells[i + 1]
+            if (!next) continue
+            const num = parseInt(next.innerText.trim())
+            if (!isNaN(num) && num >= 1 && num <= 1500) byYear[parseInt(yearMatch[1])] = num
+          }
+        }
+        break
       }
 
-      if (!Object.values(rankings).some(v => v !== null)) {
+      if (Object.keys(byYear).length === 0) {
         showToast('No year-by-year rankings found on this page', true)
         return
       }
+
+      // Sort years ascending: yr1=earliest, yr4=most recent
+      const sortedYears = Object.keys(byYear).map(Number).sort((a, b) => a - b)
+      const payload = { tennisrecruiting_id }
+      const toastParts = []
+      sortedYears.forEach((year, idx) => {
+        const slot = idx + 1
+        if (slot > 4) return
+        payload[`ranking_yr${slot}`] = byYear[year]
+        payload[`ranking_yr${slot}_year`] = year
+        toastParts.push(`${year}:#${byYear[year]}`)
+      })
 
       trigger.textContent = 'Saving...'
       trigger.style.opacity = '0.7'
@@ -987,16 +1003,16 @@ function extractPlayerData() {
         const res = await fetch(`${API_BASE}/api/tr-scout/backfill-rankings`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tennisrecruiting_id, ...rankings }),
+          body: JSON.stringify(payload),
         })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error || 'Failed')
 
-        const labels = { ranking_yr1: 'Fr', ranking_yr2: 'So', ranking_yr3: 'Jr', ranking_yr4: 'Sr' }
-        const parts = Object.entries(rankings)
-          .filter(([, v]) => v !== null)
-          .map(([k, v]) => `${labels[k]}:#${v}`)
-        showToast(`✓ Rankings saved: ${parts.join(' ')}`, false)
+        if (json.success === false && json.reason === 'player not in DB') {
+          showToast('Player not in CourtIQ DB — add them via TR Scout first', true)
+        } else {
+          showToast(`✓ Rankings saved: ${toastParts.join(' ')}`, false)
+        }
       } catch (err) {
         showToast('Failed to save rankings: ' + (err.message || 'Unknown error'), true)
       } finally {
@@ -1035,6 +1051,7 @@ function extractPlayerData() {
       } else {
         createButton()
         createSyncButton()
+        createRankingHistoryButton()
         createITFSyncButton()
         initListButtons()
       }
