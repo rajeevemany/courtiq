@@ -3,6 +3,7 @@ import Link from 'next/link'
 import AddRecruitForm from '@/app/components/AddRecruitForm'
 import SignOutButton from '@/app/components/SignOutButton'
 import ARMSExportButton from '@/app/components/ARMSExportButton'
+import CommittedRow from '@/app/components/CommittedRow'
 
 export const revalidate = 0
 
@@ -52,6 +53,14 @@ export default async function Home() {
     .select('*')
     .order('national_ranking', { ascending: true })
 
+  const { data: commitments } = await supabase
+    .from('tr_commitment_snapshots')
+    .select('tennisrecruiting_id, school, conference, grad_year')
+
+  const commitmentMap = new Map(
+    (commitments || []).map(c => [c.tennisrecruiting_id, c])
+  )
+
   if (error) {
     console.error(error)
     return <div className="p-8 text-red-500">Error loading recruits: {error.message}</div>
@@ -74,6 +83,14 @@ export default async function Home() {
     const days = daysUntil(r.first_contact_eligible)
     return days <= 0 && days >= -14
   })
+
+  const committedInPipeline = sorted.filter(r => commitmentMap.has(r.tennisrecruiting_id))
+  const watchNeglected = sorted.filter(
+    r => !commitmentMap.has(r.tennisrecruiting_id) &&
+         r.priority === 'Watch' &&
+         daysSince(r.last_contacted) > 30
+  )
+  const attentionList = [...committedInPipeline, ...watchNeglected]
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
@@ -197,8 +214,8 @@ export default async function Home() {
           </div>
 
           {/* TABLE HEADER */}
-          <div className="grid grid-cols-[1fr_80px_90px_100px_120px_80px] gap-4 px-6 py-3 border-b border-white/5">
-            {['Recruit', 'Ranking', 'Stage', 'Priority', 'Last Contact', 'Fit'].map(h => (
+          <div className="grid grid-cols-[1fr_80px_90px_100px_120px_80px_auto] gap-4 px-6 py-3 border-b border-white/5">
+            {['Recruit', 'Ranking', 'Stage', 'Priority', 'Last Contact', 'Fit', ''].map(h => (
               <span
                 key={h}
                 className="text-xs font-semibold uppercase tracking-wider text-slate-500"
@@ -216,6 +233,18 @@ export default async function Home() {
           )}
 
           {sorted.map((recruit) => {
+            const commitment = commitmentMap.get(recruit.tennisrecruiting_id)
+
+            if (commitment) {
+              return (
+                <CommittedRow
+                  key={recruit.id}
+                  recruit={recruit}
+                  commitment={commitment}
+                />
+              )
+            }
+
             const days = daysSince(recruit.last_contacted)
             const initials = recruit.name
               .split(' ')
@@ -229,7 +258,7 @@ export default async function Home() {
               <Link
                 href={`/recruits/${recruit.id}`}
                 key={recruit.id}
-                className={`grid grid-cols-[1fr_80px_90px_100px_120px_80px] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
+                className={`grid grid-cols-[1fr_80px_90px_100px_120px_80px_auto] gap-4 px-6 py-4 border-b border-white/5 border-l-4 ${getPriorityColor(recruit.priority)} hover:bg-white/5 transition-colors cursor-pointer items-center`}
               >
                 {/* NAME */}
                 <div className="flex items-center gap-3">
@@ -296,6 +325,7 @@ export default async function Home() {
                   </span>
                 </div>
 
+                <div /> {/* alignment spacer */}
               </Link>
             )
           })}
@@ -313,49 +343,55 @@ export default async function Home() {
             </p>
           </div>
 
-          {(() => {
-            const watchNeglected = sorted.filter(
-              r => r.priority === 'Watch' && daysSince(r.last_contacted) > 30
-            )
-
-            if (watchNeglected.length === 0) {
-              return (
-                <div className="px-6 py-8 text-center text-slate-500">
-                  <p className="text-sm">No neglected recruits — good work staying on top of your pipeline.</p>
-                </div>
-              )
-            }
-
-            return (
-              <div className="divide-y divide-white/5">
-                {watchNeglected.map(recruit => {
-                  const days = daysSince(recruit.last_contacted)
-                  const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
-                  return (
-                    <Link
-                      key={recruit.id}
-                      href={`/recruits/${recruit.id}`}
-                      className="flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-blue-900/50 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-300 flex-shrink-0">
-                        {initials}
-                      </div>
-                      <div className="flex-1">
+          {attentionList.length === 0 ? (
+            <div className="px-6 py-8 text-center text-slate-500">
+              <p className="text-sm">No neglected recruits — good work staying on top of your pipeline.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {attentionList.map(recruit => {
+                const days = daysSince(recruit.last_contacted)
+                const initials = recruit.name.split(' ').map((n: string) => n[0]).join('')
+                const commitment = commitmentMap.get(recruit.tennisrecruiting_id)
+                return (
+                  <Link
+                    key={recruit.id}
+                    href={`/recruits/${recruit.id}`}
+                    className={`flex items-center gap-4 px-6 py-4 hover:bg-white/5 transition-colors ${
+                      commitment ? 'border-l-4 border-rose-500/30 bg-rose-500/5' : ''
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                      commitment
+                        ? 'bg-rose-900/40 border border-rose-500/30 text-rose-300'
+                        : 'bg-blue-900/50 border border-blue-500/30 text-blue-300'
+                    }`}>
+                      {initials}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-medium text-sm">{recruit.name}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {recruit.class_year} · #{recruit.national_ranking} · {recruit.location}
-                        </p>
+                        {commitment && (
+                          <span className="text-xs bg-rose-500/15 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full">
+                            Committed → {commitment.school}
+                          </span>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-red-400 font-medium">{days}d since contact</p>
-                        <p className="text-xs text-slate-500 mt-0.5">Fit {recruit.fit_score}%</p>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )
-          })()}
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {recruit.class_year} · #{recruit.national_ranking} · {recruit.location}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-red-400 font-medium">
+                        {days === 999 ? 'Never contacted' : `${days}d since contact`}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">Fit {recruit.fit_score}%</p>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </main>
