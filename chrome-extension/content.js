@@ -1023,6 +1023,158 @@ function extractPlayerData() {
     })
   }
 
+  function createITARankingsCaptureButton() {
+    const href = window.location.href
+    if (!href.includes('colleges.wearecollegetennis.com')) return
+    if (!href.includes('/rankings')) return
+    if (document.getElementById('courtiq-ita-rankings-btn')) return
+
+    const params = new URLSearchParams(window.location.search)
+    const season      = params.get('season')      || ''
+    const matchFormat = (params.get('matchFormat') || 'SINGLES').toUpperCase()
+    const gender      = (params.get('gender')      || 'M').toUpperCase()
+    const date        = params.get('date')         || new Date().toISOString().split('T')[0]
+
+    const btn = document.createElement('div')
+    btn.id = 'courtiq-ita-rankings-btn'
+    btn.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+      ">
+        <div id="courtiq-ita-status" style="display:none;background:rgba(0,0,0,0.8);color:white;padding:6px 12px;border-radius:8px;font-size:12px;"></div>
+        <button id="courtiq-ita-trigger" style="
+          background: #0f766e;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(15,118,110,0.4);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        ">
+          ✦ Capture ITA Rankings
+        </button>
+      </div>
+    `
+    document.body.appendChild(btn)
+
+    document.getElementById('courtiq-ita-trigger').addEventListener('click', async () => {
+      const trigger  = document.getElementById('courtiq-ita-trigger')
+      const statusEl = document.getElementById('courtiq-ita-status')
+
+      // Extract rankings: try table rows first, then generic rank/name pairs
+      const rankings = []
+
+      // Strategy 1: standard <tr> rows with numeric rank in first meaningful cell
+      const rows = document.querySelectorAll('tr')
+      for (const row of rows) {
+        const cells = Array.from(row.querySelectorAll('td'))
+        if (cells.length < 2) continue
+
+        // Find a cell that is a pure integer (the rank)
+        let rank = null
+        let rankIdx = -1
+        for (let i = 0; i < Math.min(cells.length, 4); i++) {
+          const t = cells[i].innerText.trim()
+          if (/^\d+$/.test(t)) {
+            const n = parseInt(t)
+            if (n >= 1 && n <= 500) { rank = n; rankIdx = i; break }
+          }
+        }
+        if (rank === null) continue
+
+        // Name: next non-empty cell after rank
+        let name = null
+        let school = null
+        for (let i = rankIdx + 1; i < cells.length; i++) {
+          const t = cells[i].innerText.trim()
+          if (!t || /^\d+$/.test(t)) continue
+          if (!name) { name = t; continue }
+          if (!school) { school = t; break }
+        }
+        if (!name) continue
+
+        rankings.push({ rank, name, school: school || null })
+      }
+
+      // Strategy 2: fallback — elements with data-rank or class containing 'rank'
+      if (rankings.length === 0) {
+        const rankEls = document.querySelectorAll('[data-rank], [class*="rank-number"], [class*="ranking-number"]')
+        for (const el of rankEls) {
+          const rank = parseInt(el.getAttribute('data-rank') || el.innerText)
+          if (isNaN(rank) || rank < 1 || rank > 500) continue
+          const container = el.closest('[class*="row"], [class*="item"], li, tr') || el.parentElement
+          if (!container) continue
+          const nameEl = container.querySelector('[class*="name"], [class*="player"]')
+          const schoolEl = container.querySelector('[class*="school"], [class*="team"]')
+          if (!nameEl) continue
+          rankings.push({
+            rank,
+            name: nameEl.innerText.trim(),
+            school: schoolEl ? schoolEl.innerText.trim() : null,
+          })
+        }
+      }
+
+      if (rankings.length === 0) {
+        showToast('No rankings found on this page', true)
+        return
+      }
+
+      trigger.textContent = 'Capturing...'
+      trigger.style.opacity = '0.7'
+      statusEl.style.display = 'block'
+      statusEl.textContent = `Sending ${rankings.length} rankings…`
+
+      const API_BASE = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://courtiq-three.vercel.app'
+
+      try {
+        const res = await fetch(`${API_BASE}/api/ita-scout/ingest`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rankings,
+            season,
+            match_format: matchFormat,
+            gender,
+            date,
+            source_url: window.location.href,
+          }),
+        })
+
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed')
+
+        const formatLabel = matchFormat.charAt(0) + matchFormat.slice(1).toLowerCase()
+        const msg = `✓ Captured ${json.saved ?? rankings.length} ITA ${formatLabel} rankings for ${season || 'unknown season'}`
+        statusEl.textContent = msg
+        showToast(msg, false)
+      } catch (err) {
+        statusEl.textContent = `✗ ${err.message || 'Error'}`
+        showToast('Capture failed: ' + (err.message || 'Unknown error'), true)
+      } finally {
+        trigger.textContent = '✦ Capture ITA Rankings'
+        trigger.style.opacity = '1'
+        setTimeout(() => { statusEl.style.display = 'none' }, 5000)
+      }
+    })
+  }
+
   function initListButtons() {
     if (!window.location.href.includes('/list.asp')) return
     const urlId = new URLSearchParams(window.location.search).get('id') || ''
@@ -1045,20 +1197,10 @@ function extractPlayerData() {
     'www.fitp.it': true,
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      if (DOMESTIC_SOURCES_CHECK[_hostname]) {
-        createDomesticRankingsCaptureButton()
-      } else {
-        createButton()
-        createSyncButton()
-        createRankingHistoryButton()
-        createITFSyncButton()
-        initListButtons()
-      }
-    })
-  } else {
-    if (DOMESTIC_SOURCES_CHECK[_hostname]) {
+  function initAll() {
+    if (_hostname === 'colleges.wearecollegetennis.com') {
+      createITARankingsCaptureButton()
+    } else if (DOMESTIC_SOURCES_CHECK[_hostname]) {
       createDomesticRankingsCaptureButton()
     } else {
       createButton()
@@ -1067,5 +1209,11 @@ function extractPlayerData() {
       createITFSyncButton()
       initListButtons()
     }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAll)
+  } else {
+    initAll()
   }
 }

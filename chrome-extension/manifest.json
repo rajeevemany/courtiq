@@ -18,7 +18,8 @@
     "https://www.fft.fr/*",
     "https://tennismail.se/*",
     "https://www.knltb.nl/*",
-    "https://www.fitp.it/*"
+    "https://www.fitp.it/*",
+    "https://colleges.wearecollegetennis.com/*"
   ],
   "content_scripts": [
     {
@@ -40,7 +41,8 @@
         "https://www.fft.fr/*",
         "https://tennismail.se/*",
         "https://www.knltb.nl/*",
-        "https://www.fitp.it/*"
+        "https://www.fitp.it/*",
+        "https://colleges.wearecollegetennis.com/*"
       ],
       "js": ["content.js"]
     }
