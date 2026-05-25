@@ -964,7 +964,8 @@ function extractPlayerData() {
         for (const row of table.querySelectorAll('tr')) {
           const cells = Array.from(row.querySelectorAll('td'))
           for (let i = 0; i < cells.length; i++) {
-            const yearMatch = cells[i].innerText.trim().match(/^(\d{4})\s+Recruiting:?$/i)
+            const cellText = cells[i].textContent.replace(/ /g, ' ').trim()
+            const yearMatch = cellText.match(/^(\d{4})\s+Recruiting:?$/i)
             if (!yearMatch) continue
             const next = cells[i + 1]
             if (!next) continue
