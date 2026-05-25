@@ -39,10 +39,23 @@ export async function POST(request: Request) {
     if (error) throw error
 
     if (!data || data.length === 0) {
-      return NextResponse.json({ success: false, reason: 'player not in DB' })
+      // Fallback: try recruits table (columns added via migration)
+      const { data: recruitData, error: recruitError } = await supabase
+        .from('recruits')
+        .update(updates)
+        .eq('tennisrecruiting_id', String(tennisrecruiting_id))
+        .select()
+
+      console.log('[backfill] recruits fallback result:', recruitData, recruitError)
+
+      if (recruitError || !recruitData?.length) {
+        return NextResponse.json({ success: false, reason: 'player not in DB' })
+      }
+
+      return NextResponse.json({ success: true, updated, table: 'recruits' })
     }
 
-    return NextResponse.json({ success: true, updated })
+    return NextResponse.json({ success: true, updated, table: 'junior_profiles' })
   } catch (error) {
     console.error('[backfill-rankings] error:', error)
     return NextResponse.json({ success: false, error: 'Failed to save rankings' }, { status: 500 })
