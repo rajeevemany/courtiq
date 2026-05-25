@@ -118,6 +118,9 @@ export default async function Home() {
           <Link href="/analytics/prospect-discovery" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             📊 Historical Analysis
           </Link>
+          <Link href="/analytics/ita-pipeline" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
+            🏆 ITA Pipeline
+          </Link>
           <Link href="/admin/scrape" className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 border border-white/10 hover:border-white/20 rounded-lg">
             🗄 Admin
           </Link>
