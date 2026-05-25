@@ -6,51 +6,84 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+interface JuniorProfile {
+  id: string
+  name: string
+  peak_ranking: number | null
+  ranking_yr2: number | null
+  ranking_yr3: number | null
+  ranking_yr4: number | null
+  committed_school: string | null
+}
+
 export async function GET() {
   try {
-    const { data: careers, error: err1 } = await supabase
-      .from('college_careers')
-      .select('junior_profile_id, peak_ita_ranking, career_singles_wins, career_singles_losses, school, honors, career_summary')
-      .not('peak_ita_ranking', 'is', null)
-      .lte('peak_ita_ranking', 100)
-      .not('career_singles_wins', 'is', null)
-      .order('peak_ita_ranking', { ascending: true })
+    // 1. All men's singles ITA rankings, newest season first
+    const { data: itaRows, error: err1 } = await supabase
+      .from('ita_rankings')
+      .select('player_name, school, ita_rank, season')
+      .eq('match_format', 'SINGLES')
+      .eq('gender', 'M')
+      .order('season', { ascending: false })
+      .order('ita_rank', { ascending: true })
 
     if (err1) throw err1
 
-    const profileIds = (careers || []).map(c => c.junior_profile_id).filter(Boolean)
-
-    const { data: profiles, error: err2 } = await supabase
+    // 2. All junior profiles in one fetch
+    const { data: juniors, error: err2 } = await supabase
       .from('junior_profiles')
-      .select('id, name, committed_school, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4')
-      .in('id', profileIds.length ? profileIds : ['00000000-0000-0000-0000-000000000000'])
+      .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school')
 
     if (err2) throw err2
 
-    const profileMap = new Map((profiles || []).map(p => [p.id, p]))
+    // 3. Build last-name → candidates map for JS-side matching
+    const jpsByLastName = new Map<string, JuniorProfile[]>()
+    for (const jp of (juniors || []) as JuniorProfile[]) {
+      const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
+      if (!lastName) continue
+      if (!jpsByLastName.has(lastName)) jpsByLastName.set(lastName, [])
+      jpsByLastName.get(lastName)!.push(jp)
+    }
 
-    const result = (careers || [])
-      .map(c => {
-        const jp = profileMap.get(c.junior_profile_id)
-        if (!jp) return null
-        return {
-          name: jp.name,
-          school: jp.committed_school,
-          peak_tr_ranking: jp.peak_ranking,
-          soph_rank: jp.ranking_yr2,
-          junior_rank: jp.ranking_yr3,
-          senior_rank: jp.ranking_yr4,
-          ita_rank: c.peak_ita_ranking,
-          wins: c.career_singles_wins,
-          losses: c.career_singles_losses,
-          college: c.school,
-          honors: c.honors,
-          career_summary: c.career_summary,
-        }
-      })
-      .filter(Boolean)
+    // 4. Unique seasons ordered newest first
+    const seasonSet = new Set<string>()
+    for (const row of (itaRows || [])) seasonSet.add(row.season)
+    const seasons = Array.from(seasonSet).sort((a, b) => b.localeCompare(a))
 
-    return NextResponse.json(result)
+    // 5. Match each ITA player to a junior profile
+    const players = (itaRows || []).map(row => {
+      const parts = row.player_name.trim().split(/\s+/)
+      const lastName = parts[parts.length - 1].toLowerCase()
+      const firstInitial = parts[0]?.[0]?.toLowerCase() ?? ''
+
+      let matched: JuniorProfile | null = null
+      const candidates = jpsByLastName.get(lastName) ?? []
+
+      if (candidates.length === 1) {
+        matched = candidates[0]
+      } else if (candidates.length > 1) {
+        // Prefer candidate whose first name starts with the same initial
+        matched = candidates.find(jp =>
+          jp.name.split(' ')[0]?.[0]?.toLowerCase() === firstInitial
+        ) ?? candidates[0]
+      }
+
+      return {
+        ita_rank:        row.ita_rank,
+        season:          row.season,
+        player_name:     row.player_name,
+        school:          row.school ?? null,
+        tr_peak_ranking: matched?.peak_ranking ?? null,
+        soph_rank:       matched?.ranking_yr2 ?? null,
+        junior_rank:     matched?.ranking_yr3 ?? null,
+        senior_rank:     matched?.ranking_yr4 ?? null,
+        committed_school: matched?.committed_school ?? null,
+        itf_ranking:     null,
+        matched:         matched !== null,
+      }
+    })
+
+    return NextResponse.json({ seasons, players })
   } catch (error) {
     console.error('[ita-pipeline]', error)
     return NextResponse.json({ error: 'Failed to load data' }, { status: 500 })

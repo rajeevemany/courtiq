@@ -4,37 +4,44 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 
 interface Player {
-  name: string
+  ita_rank: number
+  season: string
+  player_name: string
   school: string | null
-  peak_tr_ranking: number | null
+  tr_peak_ranking: number | null
   soph_rank: number | null
   junior_rank: number | null
   senior_rank: number | null
-  ita_rank: number
-  wins: number
-  losses: number
-  college: string | null
-  honors: unknown
-  career_summary: string | null
+  committed_school: string | null
+  itf_ranking: number | null
+  matched: boolean
 }
 
-type SortKey = 'ita_rank' | 'peak_tr_ranking' | 'senior_rank' | 'wins'
-
-function getFirstHonor(honors: unknown): string {
-  if (!honors) return '—'
-  if (typeof honors === 'string') return honors.split('\n')[0] || '—'
-  if (typeof honors === 'object') {
-    const h = honors as Record<string, string[]>
-    return h.national?.[0] || h.conference?.[0] || h.regional?.[0] || '—'
-  }
-  return '—'
+interface ApiResponse {
+  seasons: string[]
+  players: Player[]
 }
+
+type SortKey = 'ita_rank' | 'tr_peak_ranking' | 'senior_rank'
+
+const ITA_FILTERS = [
+  { label: 'Top 25',  value: 25  },
+  { label: 'Top 50',  value: 50  },
+  { label: 'Top 100', value: 100 },
+  { label: 'Top 125', value: 125 },
+]
+
+const SORT_OPTIONS: { label: string; value: SortKey }[] = [
+  { label: 'ITA Rank', value: 'ita_rank'        },
+  { label: 'TR Peak',  value: 'tr_peak_ranking'  },
+  { label: 'Sr Rank',  value: 'senior_rank'      },
+]
 
 function rankColor(rank: number | null): string {
   if (rank == null) return 'text-slate-500'
-  if (rank <= 15) return 'text-emerald-400'
-  if (rank <= 30) return 'text-blue-400'
-  if (rank <= 50) return 'text-amber-400'
+  if (rank <= 15)   return 'text-emerald-400'
+  if (rank <= 30)   return 'text-blue-400'
+  if (rank <= 50)   return 'text-amber-400'
   return 'text-slate-400'
 }
 
@@ -44,81 +51,73 @@ function avg(nums: (number | null)[]): number | null {
   return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
 }
 
-const ITA_FILTERS = [
-  { label: 'Top 10', value: 10 },
-  { label: 'Top 25', value: 25 },
-  { label: 'Top 50', value: 50 },
-  { label: 'Top 100', value: 100 },
-]
-
-const SORT_OPTIONS: { label: string; value: SortKey }[] = [
-  { label: 'ITA Rank', value: 'ita_rank' },
-  { label: 'TR Peak', value: 'peak_tr_ranking' },
-  { label: 'Sr Rank', value: 'senior_rank' },
-  { label: 'Wins', value: 'wins' },
-]
-
 export default function ITAPipelinePage() {
-  const [players, setPlayers] = useState<Player[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [itaFilter, setItaFilter] = useState(100)
-  const [schoolFilter, setSchoolFilter] = useState('')
-  const [sortBy, setSortBy] = useState<SortKey>('ita_rank')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [data, setData]               = useState<ApiResponse | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState('')
+  const [selectedSeason, setSelectedSeason] = useState('2025-26')
+  const [itaFilter, setItaFilter]     = useState(100)
+  const [matchedOnly, setMatchedOnly] = useState(false)
+  const [sortBy, setSortBy]           = useState<SortKey>('ita_rank')
 
   useEffect(() => {
     fetch('/api/analytics/ita-pipeline')
       .then(r => r.json())
       .then(d => {
-        if (Array.isArray(d)) setPlayers(d)
-        else setError('Failed to load data')
+        if (d.players && d.seasons) {
+          setData(d)
+          if (d.seasons.length > 0) setSelectedSeason(d.seasons[0])
+        } else {
+          setError('Failed to load data')
+        }
       })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false))
   }, [])
 
   const filtered = useMemo(() => {
-    return players
+    if (!data) return []
+    return data.players
+      .filter(p => selectedSeason === 'all' || p.season === selectedSeason)
       .filter(p => p.ita_rank <= itaFilter)
-      .filter(p => !schoolFilter || (p.college ?? '').toLowerCase().includes(schoolFilter.toLowerCase()))
+      .filter(p => !matchedOnly || p.matched)
       .sort((a, b) => {
-        if (sortBy === 'ita_rank') return a.ita_rank - b.ita_rank
-        if (sortBy === 'peak_tr_ranking') return (a.peak_tr_ranking ?? 9999) - (b.peak_tr_ranking ?? 9999)
-        if (sortBy === 'senior_rank') return (a.senior_rank ?? 9999) - (b.senior_rank ?? 9999)
-        if (sortBy === 'wins') return (b.wins ?? 0) - (a.wins ?? 0)
+        if (sortBy === 'ita_rank')        return a.ita_rank - b.ita_rank
+        if (sortBy === 'tr_peak_ranking') return (a.tr_peak_ranking ?? 9999) - (b.tr_peak_ranking ?? 9999)
+        if (sortBy === 'senior_rank')     return (a.senior_rank ?? 9999) - (b.senior_rank ?? 9999)
         return 0
       })
-  }, [players, itaFilter, schoolFilter, sortBy])
+  }, [data, selectedSeason, itaFilter, matchedOnly, sortBy])
 
-  const stats = useMemo(() => ({
-    total: players.length,
-    avgPeakTR: avg(players.map(p => p.peak_tr_ranking)),
-    avgSoph: avg(players.map(p => p.soph_rank)),
-    avgJunior: avg(players.map(p => p.junior_rank)),
-    avgSenior: avg(players.map(p => p.senior_rank)),
-  }), [players])
+  const stats = useMemo(() => {
+    const matched = filtered.filter(p => p.matched)
+    return {
+      total:       filtered.length,
+      matchedCount: matched.length,
+      matchedPct:  filtered.length ? Math.round((matched.length / filtered.length) * 100) : 0,
+      avgPeakTR:   avg(matched.map(p => p.tr_peak_ranking)),
+      avgSenior:   avg(matched.map(p => p.senior_rank)),
+    }
+  }, [filtered])
 
-  const top25 = useMemo(() => players.filter(p => p.ita_rank <= 25), [players])
-  const top25SeniorRanks = top25
-    .map(p => p.senior_rank)
-    .filter((n): n is number => n != null)
-    .sort((a, b) => a - b)
+  // Insight: top-25 matched players in selected season
+  const top25SeniorRanks = useMemo(() => {
+    if (!data) return []
+    return data.players
+      .filter(p => (selectedSeason === 'all' || p.season === selectedSeason) && p.ita_rank <= 25 && p.matched)
+      .map(p => p.senior_rank)
+      .filter((n): n is number => n != null)
+      .sort((a, b) => a - b)
+  }, [data, selectedSeason])
+
   const medianSenior = top25SeniorRanks.length
     ? top25SeniorRanks[Math.floor(top25SeniorRanks.length / 2)]
     : null
-  const pctTop15AsSenior = top25SeniorRanks.length
+  const pctTop15 = top25SeniorRanks.length
     ? Math.round((top25SeniorRanks.filter(r => r <= 15).length / top25SeniorRanks.length) * 100)
     : null
 
-  function toggleExpand(name: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
-  }
+  const seasons = data?.seasons ?? []
 
   return (
     <main className="min-h-screen bg-[#0a1628] text-white font-sans">
@@ -139,18 +138,42 @@ export default function ITAPipelinePage() {
 
         {/* SUMMARY STATS */}
         {!loading && !error && (
-          <div className="grid grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-4 gap-3 mb-6">
             {[
-              { label: 'Total Players', value: String(stats.total) },
-              { label: 'Avg Peak TR', value: stats.avgPeakTR != null ? `#${stats.avgPeakTR}` : '—' },
-              { label: 'Avg Soph Rank', value: stats.avgSoph != null ? `#${stats.avgSoph}` : '—' },
-              { label: 'Avg Jr Rank', value: stats.avgJunior != null ? `#${stats.avgJunior}` : '—' },
-              { label: 'Avg Sr Rank', value: stats.avgSenior != null ? `#${stats.avgSenior}` : '—' },
+              { label: 'Total Ranked',    value: String(stats.total) },
+              { label: 'Matched to TR',   value: `${stats.matchedCount} (${stats.matchedPct}%)` },
+              { label: 'Avg Peak TR',     value: stats.avgPeakTR  != null ? `#${stats.avgPeakTR}`  : '—' },
+              { label: 'Avg Senior TR',   value: stats.avgSenior  != null ? `#${stats.avgSenior}`  : '—' },
             ].map(s => (
               <div key={s.label} className="bg-white/5 border border-white/10 rounded-xl p-4 text-center">
                 <div className="text-2xl font-bold text-white">{s.value}</div>
                 <div className="text-xs text-slate-400 mt-1">{s.label}</div>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* SEASON TABS */}
+        {!loading && seasons.length > 0 && (
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <button
+              onClick={() => setSelectedSeason('all')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                selectedSeason === 'all' ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            {seasons.map(s => (
+              <button
+                key={s}
+                onClick={() => setSelectedSeason(s)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  selectedSeason === s ? 'bg-blue-600 text-white' : 'bg-white/5 text-slate-400 hover:text-white'
+                }`}
+              >
+                {s}
+              </button>
             ))}
           </div>
         )}
@@ -163,9 +186,7 @@ export default function ITAPipelinePage() {
                 key={f.value}
                 onClick={() => setItaFilter(f.value)}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  itaFilter === f.value
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white/5 text-slate-400 hover:text-white'
+                  itaFilter === f.value ? 'bg-blue-600/80 text-white' : 'bg-white/5 text-slate-400 hover:text-white'
                 }`}
               >
                 {f.label}
@@ -173,13 +194,16 @@ export default function ITAPipelinePage() {
             ))}
           </div>
 
-          <input
-            type="text"
-            placeholder="Filter by college..."
-            value={schoolFilter}
-            onChange={e => setSchoolFilter(e.target.value)}
-            className="bg-white/5 border border-white/10 text-sm text-white rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500 placeholder-slate-500 transition-colors"
-          />
+          <button
+            onClick={() => setMatchedOnly(!matchedOnly)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              matchedOnly
+                ? 'bg-emerald-600/30 border-emerald-500/40 text-emerald-300'
+                : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+            }`}
+          >
+            {matchedOnly ? '✓ TR Matched Only' : 'TR Matched Only'}
+          </button>
 
           <div className="flex rounded-lg border border-white/10 overflow-hidden ml-auto">
             {SORT_OPTIONS.map(s => (
@@ -187,9 +211,7 @@ export default function ITAPipelinePage() {
                 key={s.value}
                 onClick={() => setSortBy(s.value)}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  sortBy === s.value
-                    ? 'bg-slate-700 text-white'
-                    : 'bg-white/5 text-slate-400 hover:text-white'
+                  sortBy === s.value ? 'bg-slate-700 text-white' : 'bg-white/5 text-slate-400 hover:text-white'
                 }`}
               >
                 {s.label}
@@ -197,23 +219,17 @@ export default function ITAPipelinePage() {
             ))}
           </div>
 
-          {!loading && (
-            <span className="text-xs text-slate-500">{filtered.length} players</span>
-          )}
+          {!loading && <span className="text-xs text-slate-500">{filtered.length} players</span>}
         </div>
 
         {/* LOADING / ERROR */}
-        {loading && (
-          <div className="text-center py-20 text-slate-500 text-sm">Loading...</div>
-        )}
-        {error && (
-          <div className="bg-red-950/40 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">{error}</div>
-        )}
+        {loading && <div className="text-center py-20 text-slate-500 text-sm">Loading...</div>}
+        {error && <div className="bg-red-950/40 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">{error}</div>}
 
         {/* TABLE */}
         {!loading && !error && (
           <div className="bg-white/3 border border-white/10 rounded-2xl overflow-hidden mb-6">
-            <div className="grid grid-cols-[60px_1fr_160px_80px_70px_70px_70px_90px_1fr] gap-3 px-5 py-3 border-b border-white/10 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+            <div className="grid grid-cols-[60px_1fr_180px_80px_70px_70px_70px_90px] gap-3 px-5 py-3 border-b border-white/10 text-xs font-semibold text-slate-400 uppercase tracking-wide">
               <div>ITA #</div>
               <div>Player</div>
               <div>College</div>
@@ -221,18 +237,14 @@ export default function ITAPipelinePage() {
               <div>Soph</div>
               <div>Jr</div>
               <div>Sr</div>
-              <div>Career</div>
-              <div>Honors</div>
+              <div>Matched?</div>
             </div>
 
             {filtered.length === 0 && (
-              <div className="px-5 py-12 text-center text-slate-500 text-sm">
-                No players match the current filters.
-              </div>
+              <div className="px-5 py-12 text-center text-slate-500 text-sm">No players match the current filters.</div>
             )}
 
             {filtered.map((p, i) => {
-              const isExpanded = expanded.has(p.name)
               const itaColor = p.ita_rank <= 10
                 ? 'text-yellow-400'
                 : p.ita_rank <= 25
@@ -240,45 +252,38 @@ export default function ITAPipelinePage() {
                   : 'text-slate-300'
 
               return (
-                <div key={`${p.name}-${i}`}>
-                  <div className={`grid grid-cols-[60px_1fr_160px_80px_70px_70px_70px_90px_1fr] gap-3 px-5 py-3.5 border-b border-white/5 items-center hover:bg-white/3 transition-colors ${i % 2 !== 0 ? 'bg-white/[0.02]' : ''}`}>
-                    <div className={`font-mono font-bold text-sm ${itaColor}`}>#{p.ita_rank}</div>
-                    <div>
-                      <button
-                        onClick={() => toggleExpand(p.name)}
-                        className="text-sm font-medium text-left hover:text-blue-300 transition-colors"
-                      >
-                        {p.name}
-                        {p.career_summary && (
-                          <span className="ml-1.5 text-xs text-slate-500">{isExpanded ? '▲' : '▼'}</span>
-                        )}
-                      </button>
-                    </div>
-                    <div className="text-sm text-slate-300 truncate">{p.college ?? '—'}</div>
-                    <div className={`font-mono text-sm font-semibold ${rankColor(p.peak_tr_ranking)}`}>
-                      {p.peak_tr_ranking ? `#${p.peak_tr_ranking}` : '—'}
-                    </div>
-                    <div className={`font-mono text-sm ${rankColor(p.soph_rank)}`}>
-                      {p.soph_rank ? `#${p.soph_rank}` : '—'}
-                    </div>
-                    <div className={`font-mono text-sm ${rankColor(p.junior_rank)}`}>
-                      {p.junior_rank ? `#${p.junior_rank}` : '—'}
-                    </div>
-                    <div className={`font-mono text-sm ${rankColor(p.senior_rank)}`}>
-                      {p.senior_rank ? `#${p.senior_rank}` : '—'}
-                    </div>
-                    <div className="text-xs text-slate-400 font-mono whitespace-nowrap">
-                      {p.wins != null && p.losses != null ? `${p.wins}W-${p.losses}L` : '—'}
-                    </div>
-                    <div className="text-xs text-slate-400 truncate" title={getFirstHonor(p.honors)}>
-                      {getFirstHonor(p.honors)}
-                    </div>
-                  </div>
+                <div
+                  key={`${p.player_name}-${p.season}-${i}`}
+                  className={`grid grid-cols-[60px_1fr_180px_80px_70px_70px_70px_90px] gap-3 px-5 py-3.5 border-b border-white/5 items-center hover:bg-white/3 transition-colors ${i % 2 !== 0 ? 'bg-white/[0.02]' : ''}`}
+                >
+                  <div className={`font-mono font-bold text-sm ${itaColor}`}>#{p.ita_rank}</div>
+                  <div className="text-sm font-medium truncate">{p.player_name}</div>
+                  <div className="text-sm text-slate-300 truncate">{p.school ?? '—'}</div>
 
-                  {isExpanded && p.career_summary && (
-                    <div className="px-5 py-4 bg-blue-950/20 border-b border-white/5">
-                      <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap">{p.career_summary}</p>
-                    </div>
+                  {p.matched ? (
+                    <>
+                      <div className={`font-mono text-sm font-semibold ${rankColor(p.tr_peak_ranking)}`}>
+                        {p.tr_peak_ranking ? `#${p.tr_peak_ranking}` : '—'}
+                      </div>
+                      <div className={`font-mono text-sm ${rankColor(p.soph_rank)}`}>
+                        {p.soph_rank ? `#${p.soph_rank}` : '—'}
+                      </div>
+                      <div className={`font-mono text-sm ${rankColor(p.junior_rank)}`}>
+                        {p.junior_rank ? `#${p.junior_rank}` : '—'}
+                      </div>
+                      <div className={`font-mono text-sm ${rankColor(p.senior_rank)}`}>
+                        {p.senior_rank ? `#${p.senior_rank}` : '—'}
+                      </div>
+                      <div className="text-xs text-emerald-400 font-medium">✓ Matched</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="col-span-4 text-xs text-slate-500 flex items-center gap-2">
+                        <span>🌍</span>
+                        <span>International — no TR data</span>
+                      </div>
+                      <div className="text-xs text-slate-600">—</div>
+                    </>
                   )}
                 </div>
               )
@@ -286,16 +291,20 @@ export default function ITAPipelinePage() {
           </div>
         )}
 
-        {/* INSIGHT CALLOUT */}
+        {/* INSIGHT */}
         {!loading && !error && medianSenior != null && (
           <div className="bg-amber-950/30 border border-amber-500/20 rounded-2xl p-5">
             <p className="text-sm font-semibold text-amber-300 mb-1">Pipeline Insight</p>
             <p className="text-sm text-slate-300 leading-relaxed">
-              Among top-25 ITA players, the median senior year TR ranking was{' '}
+              Among top-25 ITA players in{' '}
+              <span className="text-white font-semibold">
+                {selectedSeason === 'all' ? 'all seasons' : selectedSeason}
+              </span>
+              , the median senior year TR ranking was{' '}
               <span className="text-white font-semibold">#{medianSenior}</span>.{' '}
-              {pctTop15AsSenior != null && (
+              {pctTop15 != null && (
                 <>
-                  <span className="text-white font-semibold">{pctTop15AsSenior}%</span>
+                  <span className="text-white font-semibold">{pctTop15}%</span>
                   {' '}were ranked in the top&nbsp;15 nationally as seniors.
                 </>
               )}
