@@ -36,13 +36,13 @@ export async function GET() {
 
     if (err2) throw err2
 
-    // 3. Build last-name → candidates map for JS-side matching
-    const jpsByLastName = new Map<string, JuniorProfile[]>()
+    // 3. Build last-name → candidates map (jp.name format is "M. Zheng")
+    const jpMap = new Map<string, JuniorProfile[]>()
     for (const jp of (juniors || []) as JuniorProfile[]) {
       const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
       if (!lastName) continue
-      if (!jpsByLastName.has(lastName)) jpsByLastName.set(lastName, [])
-      jpsByLastName.get(lastName)!.push(jp)
+      if (!jpMap.has(lastName)) jpMap.set(lastName, [])
+      jpMap.get(lastName)!.push(jp)
     }
 
     // 4. Unique seasons ordered newest first
@@ -51,22 +51,17 @@ export async function GET() {
     const seasons = Array.from(seasonSet).sort((a, b) => b.localeCompare(a))
 
     // 5. Match each ITA player to a junior profile
+    //    ITA names are "Michael Zheng"; jp names are "M. Zheng"
+    //    Match on last name + first initial (jp.name[0] === ITA first name[0])
     const players = (itaRows || []).map(row => {
       const parts = row.player_name.trim().split(/\s+/)
-      const lastName = parts[parts.length - 1].toLowerCase()
-      const firstInitial = parts[0]?.[0]?.toLowerCase() ?? ''
+      const lastName  = parts[parts.length - 1].toLowerCase()
+      const firstName = parts[0] ?? ''
 
-      let matched: JuniorProfile | null = null
-      const candidates = jpsByLastName.get(lastName) ?? []
-
-      if (candidates.length === 1) {
-        matched = candidates[0]
-      } else if (candidates.length > 1) {
-        // Prefer candidate whose first name starts with the same initial
-        matched = candidates.find(jp =>
-          jp.name.split(' ')[0]?.[0]?.toLowerCase() === firstInitial
-        ) ?? candidates[0]
-      }
+      const candidates = jpMap.get(lastName) ?? []
+      const matched = candidates.find(jp =>
+        jp.name[0]?.toLowerCase() === firstName[0]?.toLowerCase()
+      ) ?? (candidates.length === 1 ? candidates[0] : null)
 
       return {
         ita_rank:        row.ita_rank,
