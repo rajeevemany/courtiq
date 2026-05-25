@@ -908,6 +908,104 @@ function extractPlayerData() {
     })
   }
 
+  function createRankingHistoryButton() {
+    const href = window.location.href
+    if (!href.includes('tennisrecruiting.net')) return
+    if (!href.includes('/player.asp') && !href.includes('/player/activity.asp')) return
+    if (document.getElementById('courtiq-ranking-history-btn')) return
+
+    const urlMatch = href.match(/[?&]id=(\d+)/)
+    if (!urlMatch) return
+    const tennisrecruiting_id = urlMatch[1]
+
+    const btn = document.createElement('div')
+    btn.id = 'courtiq-ranking-history-btn'
+    btn.innerHTML = `
+      <div style="
+        position: fixed;
+        bottom: 140px;
+        right: 24px;
+        z-index: 99999;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      ">
+        <button id="courtiq-ranking-history-trigger" style="
+          background: #7c3aed;
+          color: white;
+          border: none;
+          padding: 12px 20px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          box-shadow: 0 4px 20px rgba(124,58,237,0.4);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          white-space: nowrap;
+        ">
+          📊 Save Ranking History
+        </button>
+      </div>
+    `
+    document.body.appendChild(btn)
+
+    document.getElementById('courtiq-ranking-history-trigger').addEventListener('click', async () => {
+      const trigger = document.getElementById('courtiq-ranking-history-trigger')
+
+      const yearMap = {
+        'Freshman': 'ranking_yr1', 'Fr.': 'ranking_yr1', 'FR': 'ranking_yr1',
+        'Sophomore': 'ranking_yr2', 'So.': 'ranking_yr2', 'SO': 'ranking_yr2',
+        'Junior': 'ranking_yr3', 'Jr.': 'ranking_yr3', 'JR': 'ranking_yr3',
+        'Senior': 'ranking_yr4', 'Sr.': 'ranking_yr4', 'SR': 'ranking_yr4',
+      }
+      const rankings = { ranking_yr1: null, ranking_yr2: null, ranking_yr3: null, ranking_yr4: null }
+
+      const cells = Array.from(document.querySelectorAll('td, th'))
+      for (let i = 0; i < cells.length; i++) {
+        const text = cells[i].innerText.trim()
+        const key = yearMap[text]
+        if (!key || rankings[key] !== null) continue
+        const next = cells[i + 1]
+        if (!next) continue
+        const num = parseInt(next.innerText.trim())
+        if (!isNaN(num) && num >= 1 && num <= 1500) rankings[key] = num
+      }
+
+      if (!Object.values(rankings).some(v => v !== null)) {
+        showToast('No year-by-year rankings found on this page', true)
+        return
+      }
+
+      trigger.textContent = 'Saving...'
+      trigger.style.opacity = '0.7'
+
+      const API_BASE = window.location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://courtiq-three.vercel.app'
+
+      try {
+        const res = await fetch(`${API_BASE}/api/tr-scout/backfill-rankings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tennisrecruiting_id, ...rankings }),
+        })
+        const json = await res.json()
+        if (!res.ok) throw new Error(json.error || 'Failed')
+
+        const labels = { ranking_yr1: 'Fr', ranking_yr2: 'So', ranking_yr3: 'Jr', ranking_yr4: 'Sr' }
+        const parts = Object.entries(rankings)
+          .filter(([, v]) => v !== null)
+          .map(([k, v]) => `${labels[k]}:#${v}`)
+        showToast(`✓ Rankings saved: ${parts.join(' ')}`, false)
+      } catch (err) {
+        showToast('Failed to save rankings: ' + (err.message || 'Unknown error'), true)
+      } finally {
+        trigger.textContent = '📊 Save Ranking History'
+        trigger.style.opacity = '1'
+      }
+    })
+  }
+
   function initListButtons() {
     if (!window.location.href.includes('/list.asp')) return
     const urlId = new URLSearchParams(window.location.search).get('id') || ''
@@ -947,6 +1045,7 @@ function extractPlayerData() {
     } else {
       createButton()
       createSyncButton()
+      createRankingHistoryButton()
       createITFSyncButton()
       initListButtons()
     }
