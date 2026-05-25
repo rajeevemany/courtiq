@@ -41,7 +41,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\rajee\\\\courtiq\\\\app\\\\api\\\\ita-scout\\\\ingest\")",
+      "Bash(Out-Null)"
     ]
   }
 }
