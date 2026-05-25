@@ -1,4 +1,4 @@
-if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com') || window.location.href.includes('tennisrecruiting.net/list.asp') || window.location.href.includes('competitions.lta.org.uk') || window.location.href.includes('tenniseurope.org')) {
+if (window.location.href.includes('tennisrecruiting.net/player') || window.location.href.includes('itftennis.com') || window.location.href.includes('tennisrecruiting.net/list.asp') || window.location.href.includes('competitions.lta.org.uk') || window.location.href.includes('tenniseurope.org') || window.location.href.includes('colleges.wearecollegetennis.com')) {
 
 function showToast(message, isError) {
   const existing = document.getElementById('courtiq-toast')
