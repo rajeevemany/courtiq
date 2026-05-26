@@ -14,6 +14,7 @@ interface JuniorProfile {
   ranking_yr3: number | null
   ranking_yr4: number | null
   committed_school: string | null
+  tennisrecruiting_id: string | null
 }
 
 export async function GET() {
@@ -29,10 +30,11 @@ export async function GET() {
 
     if (err1) throw err1
 
-    // 2. All junior profiles in one fetch
+    // 2. All junior profiles in one fetch (explicit limit to bypass default page size)
     const { data: juniors, error: err2 } = await supabase
       .from('junior_profiles')
-      .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school')
+      .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school, tennisrecruiting_id')
+      .limit(2500)
 
     if (err2) throw err2
 
@@ -47,6 +49,7 @@ export async function GET() {
 
     console.log('[ita-pipeline] jpMap size:', jpMap.size)
     console.log('[ita-pipeline] zheng entry:', JSON.stringify(jpMap.get('zheng')))
+    console.log('[ita-pipeline] sample jpMap keys:', Array.from(jpMap.keys()).slice(0, 10))
 
     // 4. Unique seasons ordered newest first
     const seasonSet = new Set<string>()
