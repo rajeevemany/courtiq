@@ -88,11 +88,13 @@ export async function GET() {
       ) ?? (candidates.length === 1 ? candidates[0] : null)
 
       if (row.player_name.toLowerCase().includes('zheng')) {
-        console.log('[ita-pipeline] zheng match attempt:', {
-          player_name: row.player_name,
-          lastName,
-          candidates: jpMap.get(lastName)?.map(j => j.name),
-        })
+        const zCandidates = jpMap.get(lastName) ?? []
+        console.log('[ita-pipeline] zheng firstName:', firstName,
+          'firstName[0]:', firstName[0],
+          'jp.name[0]:', zCandidates[0]?.name[0],
+          'match:', zCandidates[0]?.name[0]?.toLowerCase() === firstName[0]?.toLowerCase(),
+          'matched:', matched?.name ?? null,
+        )
       }
 
       return {
