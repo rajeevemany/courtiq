@@ -45,6 +45,9 @@ export async function GET() {
       jpMap.get(lastName)!.push(jp)
     }
 
+    console.log('[ita-pipeline] jpMap size:', jpMap.size)
+    console.log('[ita-pipeline] zheng entry:', JSON.stringify(jpMap.get('zheng')))
+
     // 4. Unique seasons ordered newest first
     const seasonSet = new Set<string>()
     for (const row of (itaRows || [])) seasonSet.add(row.season)
@@ -62,6 +65,14 @@ export async function GET() {
       const matched = candidates.find(jp =>
         jp.name[0]?.toLowerCase() === firstName[0]?.toLowerCase()
       ) ?? (candidates.length === 1 ? candidates[0] : null)
+
+      if (row.player_name.toLowerCase().includes('zheng')) {
+        console.log('[ita-pipeline] zheng match attempt:', {
+          player_name: row.player_name,
+          lastName,
+          candidates: jpMap.get(lastName)?.map(j => j.name),
+        })
+      }
 
       return {
         ita_rank:        row.ita_rank,
