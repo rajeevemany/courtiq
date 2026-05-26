@@ -1,10 +1,32 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+async function fetchAllJuniorProfiles(client: SupabaseClient) {
+  const allProfiles: JuniorProfile[] = []
+  const batchSize = 1000
+  let from = 0
+
+  while (true) {
+    const { data, error } = await client
+      .from('junior_profiles')
+      .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school, tennisrecruiting_id')
+      .range(from, from + batchSize - 1)
+
+    if (error) throw error
+    if (!data || data.length === 0) break
+
+    allProfiles.push(...(data as JuniorProfile[]))
+    if (data.length < batchSize) break
+    from += batchSize
+  }
+
+  return allProfiles
+}
 
 interface JuniorProfile {
   id: string
@@ -30,19 +52,13 @@ export async function GET() {
 
     if (err1) throw err1
 
-    // 2. All junior profiles — use .range() to override the default 1000-row PostgREST limit
-    const { data: allJuniors, error: jpError } = await supabase
-      .from('junior_profiles')
-      .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school, tennisrecruiting_id')
-      .range(0, 2499)
-
-    console.log('[ita-pipeline] allJuniors count:', allJuniors?.length, jpError)
-
-    if (jpError) throw jpError
+    // 2. All junior profiles in batches of 1000 to bypass PostgREST page limit
+    const allJuniors = await fetchAllJuniorProfiles(supabase)
+    console.log('[ita-pipeline] allJuniors total:', allJuniors.length)
 
     // 3. Build last-name → candidates map (jp.name format is "M. Zheng")
     const jpMap = new Map<string, JuniorProfile[]>()
-    for (const jp of (allJuniors || []) as JuniorProfile[]) {
+    for (const jp of allJuniors) {
       const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
       if (!lastName) continue
       if (!jpMap.has(lastName)) jpMap.set(lastName, [])
