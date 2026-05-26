@@ -14,6 +14,7 @@ interface Player {
   senior_rank: number | null
   committed_school: string | null
   itf_ranking: number | null
+  nationality: string | null
   matched: boolean
 }
 
@@ -278,9 +279,19 @@ export default function ITAPipelinePage() {
                     </>
                   ) : (
                     <>
-                      <div className="col-span-4 text-xs text-slate-500 flex items-center gap-2">
-                        <span>🌍</span>
-                        <span>International — no TR data</span>
+                      <div className="col-span-4 flex items-center gap-2">
+                        {p.itf_ranking != null ? (
+                          <>
+                            <span className="text-xs text-blue-400 font-medium">
+                              🌍 ITF #{p.itf_ranking}
+                            </span>
+                            {p.nationality && (
+                              <span className="text-xs text-slate-500">{p.nationality}</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-xs text-slate-500">🌍 International</span>
+                        )}
                       </div>
                       <div className="text-xs text-slate-600">—</div>
                     </>

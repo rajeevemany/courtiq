@@ -20,6 +20,12 @@ interface JuniorProfile {
   tennisrecruiting_id: string | null
 }
 
+interface ITFEntry {
+  ranking: number
+  nationality: string
+  firstInitial: string
+}
+
 async function fetchAllJuniorProfiles(client: SupabaseClient) {
   const allProfiles: JuniorProfile[] = []
   const batchSize = 1000
@@ -58,7 +64,27 @@ export async function GET() {
     // 2. All junior profiles in batches to bypass PostgREST page limit
     const allJuniors = await fetchAllJuniorProfiles(supabase)
 
-    // 3. Build last-name → candidates map (jp.name format: "M. Zheng")
+    // 3. ITF cache for cross-referencing unmatched international players
+    const { data: itfPlayers } = await supabase
+      .from('itf_players_cache')
+      .select('name, ranking, nationality')
+
+    // Build last-name → ITF entry map (itf names are full: "Michael Zheng")
+    const itfMap = new Map<string, ITFEntry>()
+    for (const p of (itfPlayers || [])) {
+      const parts = (p.name as string).trim().split(/\s+/)
+      const lastName = parts[parts.length - 1]?.toLowerCase()
+      if (!lastName) continue
+      if (!itfMap.has(lastName)) {
+        itfMap.set(lastName, {
+          ranking:      p.ranking,
+          nationality:  p.nationality,
+          firstInitial: parts[0]?.[0]?.toLowerCase() ?? '',
+        })
+      }
+    }
+
+    // 4. Build last-name → candidates map (jp.name format: "M. Zheng")
     const jpMap = new Map<string, JuniorProfile[]>()
     for (const jp of allJuniors) {
       const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
@@ -67,12 +93,12 @@ export async function GET() {
       jpMap.get(lastName)!.push(jp)
     }
 
-    // 4. Unique seasons ordered newest first
+    // 5. Unique seasons ordered newest first
     const seasonSet = new Set<string>()
     for (const row of (itaRows || [])) seasonSet.add(row.season)
     const seasons = Array.from(seasonSet).sort((a, b) => b.localeCompare(a))
 
-    // 5. Match each ITA player to a junior profile
+    // 6. Match each ITA player to a junior profile
     //    ITA names: "Michael Zheng" — jp names: "M. Zheng"
     //    Primary: last name + first initial; fallback: single candidate only
     const players = (itaRows || []).map(row => {
@@ -85,6 +111,17 @@ export async function GET() {
         jp.name[0]?.toLowerCase() === firstName[0]?.toLowerCase()
       ) ?? (candidates.length === 1 ? candidates[0] : null)
 
+      // For unmatched players, try ITF cache (first initial + last name)
+      let itf_ranking: number | null = null
+      let nationality: string | null = null
+      if (!matched) {
+        const itfEntry = itfMap.get(lastName)
+        if (itfEntry && (itfEntry.firstInitial === firstName[0]?.toLowerCase() || !itfEntry.firstInitial)) {
+          itf_ranking = itfEntry.ranking
+          nationality = itfEntry.nationality
+        }
+      }
+
       return {
         ita_rank:         row.ita_rank,
         season:           row.season,
@@ -95,7 +132,8 @@ export async function GET() {
         junior_rank:      matched?.ranking_yr3 ?? null,
         senior_rank:      matched?.ranking_yr4 ?? null,
         committed_school: matched?.committed_school ?? null,
-        itf_ranking:      null,
+        itf_ranking,
+        nationality,
         matched:          matched !== null,
       }
     })
