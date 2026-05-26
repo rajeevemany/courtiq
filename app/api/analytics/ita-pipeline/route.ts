@@ -30,17 +30,19 @@ export async function GET() {
 
     if (err1) throw err1
 
-    // 2. All junior profiles in one fetch (explicit limit to bypass default page size)
-    const { data: juniors, error: err2 } = await supabase
+    // 2. All junior profiles — use .range() to override the default 1000-row PostgREST limit
+    const { data: allJuniors, error: jpError } = await supabase
       .from('junior_profiles')
       .select('id, name, peak_ranking, ranking_yr2, ranking_yr3, ranking_yr4, committed_school, tennisrecruiting_id')
-      .limit(2500)
+      .range(0, 2499)
 
-    if (err2) throw err2
+    console.log('[ita-pipeline] allJuniors count:', allJuniors?.length, jpError)
+
+    if (jpError) throw jpError
 
     // 3. Build last-name → candidates map (jp.name format is "M. Zheng")
     const jpMap = new Map<string, JuniorProfile[]>()
-    for (const jp of (juniors || []) as JuniorProfile[]) {
+    for (const jp of (allJuniors || []) as JuniorProfile[]) {
       const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
       if (!lastName) continue
       if (!jpMap.has(lastName)) jpMap.set(lastName, [])
