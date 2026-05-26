@@ -110,6 +110,11 @@ export async function GET() {
       }
     })
 
+    const matchedCount = players.filter(r => r.matched).length
+    const unmatchedSample = players.filter(r => !r.matched).slice(0, 10).map(r => r.player_name)
+    console.log('[ita-pipeline] matched:', matchedCount, '/', players.length)
+    console.log('[ita-pipeline] unmatched sample:', unmatchedSample)
+
     return NextResponse.json({ seasons, players })
   } catch (error) {
     console.error('[ita-pipeline]', error)
