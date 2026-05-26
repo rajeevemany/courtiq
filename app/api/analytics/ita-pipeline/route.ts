@@ -1,10 +1,24 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+export const revalidate = 0
+export const dynamic = 'force-dynamic'
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+interface JuniorProfile {
+  id: string
+  name: string
+  peak_ranking: number | null
+  ranking_yr2: number | null
+  ranking_yr3: number | null
+  ranking_yr4: number | null
+  committed_school: string | null
+  tennisrecruiting_id: string | null
+}
 
 async function fetchAllJuniorProfiles(client: SupabaseClient) {
   const allProfiles: JuniorProfile[] = []
@@ -28,17 +42,6 @@ async function fetchAllJuniorProfiles(client: SupabaseClient) {
   return allProfiles
 }
 
-interface JuniorProfile {
-  id: string
-  name: string
-  peak_ranking: number | null
-  ranking_yr2: number | null
-  ranking_yr3: number | null
-  ranking_yr4: number | null
-  committed_school: string | null
-  tennisrecruiting_id: string | null
-}
-
 export async function GET() {
   try {
     // 1. All men's singles ITA rankings, newest season first
@@ -52,11 +55,10 @@ export async function GET() {
 
     if (err1) throw err1
 
-    // 2. All junior profiles in batches of 1000 to bypass PostgREST page limit
+    // 2. All junior profiles in batches to bypass PostgREST page limit
     const allJuniors = await fetchAllJuniorProfiles(supabase)
-    console.log('[ita-pipeline] allJuniors total:', allJuniors.length)
 
-    // 3. Build last-name → candidates map (jp.name format is "M. Zheng")
+    // 3. Build last-name → candidates map (jp.name format: "M. Zheng")
     const jpMap = new Map<string, JuniorProfile[]>()
     for (const jp of allJuniors) {
       const lastName = jp.name.split(' ').pop()?.toLowerCase() ?? ''
@@ -65,18 +67,14 @@ export async function GET() {
       jpMap.get(lastName)!.push(jp)
     }
 
-    console.log('[ita-pipeline] jpMap size:', jpMap.size)
-    console.log('[ita-pipeline] zheng entry:', JSON.stringify(jpMap.get('zheng')))
-    console.log('[ita-pipeline] sample jpMap keys:', Array.from(jpMap.keys()).slice(0, 10))
-
     // 4. Unique seasons ordered newest first
     const seasonSet = new Set<string>()
     for (const row of (itaRows || [])) seasonSet.add(row.season)
     const seasons = Array.from(seasonSet).sort((a, b) => b.localeCompare(a))
 
     // 5. Match each ITA player to a junior profile
-    //    ITA names are "Michael Zheng"; jp names are "M. Zheng"
-    //    Match on last name + first initial (jp.name[0] === ITA first name[0])
+    //    ITA names: "Michael Zheng" — jp names: "M. Zheng"
+    //    Primary: last name + first initial; fallback: single candidate only
     const players = (itaRows || []).map(row => {
       const parts = row.player_name.trim().split(/\s+/)
       const lastName  = parts[parts.length - 1].toLowerCase()
@@ -87,35 +85,20 @@ export async function GET() {
         jp.name[0]?.toLowerCase() === firstName[0]?.toLowerCase()
       ) ?? (candidates.length === 1 ? candidates[0] : null)
 
-      if (row.player_name.toLowerCase().includes('zheng')) {
-        const zCandidates = jpMap.get(lastName) ?? []
-        console.log('[ita-pipeline] zheng firstName:', firstName,
-          'firstName[0]:', firstName[0],
-          'jp.name[0]:', zCandidates[0]?.name[0],
-          'match:', zCandidates[0]?.name[0]?.toLowerCase() === firstName[0]?.toLowerCase(),
-          'matched:', matched?.name ?? null,
-        )
-      }
-
       return {
-        ita_rank:        row.ita_rank,
-        season:          row.season,
-        player_name:     row.player_name,
-        school:          row.school ?? null,
-        tr_peak_ranking: matched?.peak_ranking ?? null,
-        soph_rank:       matched?.ranking_yr2 ?? null,
-        junior_rank:     matched?.ranking_yr3 ?? null,
-        senior_rank:     matched?.ranking_yr4 ?? null,
+        ita_rank:         row.ita_rank,
+        season:           row.season,
+        player_name:      row.player_name,
+        school:           row.school ?? null,
+        tr_peak_ranking:  matched?.peak_ranking ?? null,
+        soph_rank:        matched?.ranking_yr2 ?? null,
+        junior_rank:      matched?.ranking_yr3 ?? null,
+        senior_rank:      matched?.ranking_yr4 ?? null,
         committed_school: matched?.committed_school ?? null,
-        itf_ranking:     null,
-        matched:         matched !== null,
+        itf_ranking:      null,
+        matched:          matched !== null,
       }
     })
-
-    const matchedCount = players.filter(r => r.matched).length
-    const unmatchedSample = players.filter(r => !r.matched).slice(0, 10).map(r => r.player_name)
-    console.log('[ita-pipeline] matched:', matchedCount, '/', players.length)
-    console.log('[ita-pipeline] unmatched sample:', unmatchedSample)
 
     return NextResponse.json({ seasons, players })
   } catch (error) {

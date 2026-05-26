@@ -61,7 +61,7 @@ export default function ITAPipelinePage() {
   const [sortBy, setSortBy]           = useState<SortKey>('ita_rank')
 
   useEffect(() => {
-    fetch('/api/analytics/ita-pipeline')
+    fetch('/api/analytics/ita-pipeline', { cache: 'no-store' })
       .then(r => r.json())
       .then(d => {
         if (d.players && d.seasons) {
